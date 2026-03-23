@@ -122,7 +122,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self._cors()
                 self.end_headers()
                 while True:
-                    chunk = resp.read(4096)
+                    chunk = resp.read(1024)
                     if not chunk:
                         break
                     self.wfile.write(chunk)

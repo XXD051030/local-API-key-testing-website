@@ -157,8 +157,8 @@ body {
 #topbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: 6px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--bg2);
   flex-shrink: 0;
@@ -169,11 +169,11 @@ body {
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text);
-  padding: 6px 10px;
-  font-size: 13px;
+  padding: 4px 8px;
+  font-size: 12px;
   outline: none;
   cursor: pointer;
-  max-width: 160px;
+  max-width: 180px;
   transition: border-color .15s;
 }
 #key-selector:focus { border-color: var(--accent); }
@@ -815,7 +815,6 @@ body {
 
   <!-- Topbar -->
   <div id="topbar">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" style="flex-shrink:0"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
     <select id="key-selector" title="Active API Key"></select>
     <div class="topbar-right">
       <button class="icon-btn" id="btn-regen" style="display:none" title="Regenerate last reply">
@@ -1046,7 +1045,12 @@ function renderPresetList() {
         ${g.models.length === 0 ? '<div style="font-size:12px;color:var(--text3);padding:3px 2px">No models yet</div>' : ''}
         ${g.models.map((m, mi) => `
           <div class="preset-model-row">
-            <span class="preset-model-name">${escHtml(m)}</span>
+            <span class="preset-model-name">
+              ${escHtml(m)}
+              ${Array.isArray(settings.thinkingModels) && settings.thinkingModels.includes(m)
+                ? '<span style="color:var(--accent);font-size:11px;margin-left:6px;white-space:nowrap">Thinking</span>'
+                : ''}
+            </span>
             <button class="key-act-btn del preset-del-model" data-gi="${gi}" data-mi="${mi}" title="Remove">✕</button>
           </div>`).join('')}
         <div class="preset-add-row">
@@ -1067,6 +1071,7 @@ let settings = {
   maxTokens: '',
   stream: true,
   presets: null,      // null = use built-in MODEL_GROUPS
+  thinkingModels: [],
 };
 let conversations = [];
 let activeConvId = null;
@@ -1124,6 +1129,7 @@ async function loadSettingsFromFile() {
     settings = { ...settings, ...data };
     // Ensure apiKeys is array
     if (!Array.isArray(settings.apiKeys)) settings.apiKeys = [];
+    if (!Array.isArray(settings.thinkingModels)) settings.thinkingModels = [];
   }
 }
 
@@ -1420,7 +1426,7 @@ function buildMsgHTML(msg, idx) {
   const isUser  = msg.role === 'user';
   const content = isUser
     ? `<div class="msg-content">${escHtml(msg.content).replace(/\n/g, '<br>')}</div>`
-    : `<div class="msg-content">${marked.parse(msg.content)}</div>`;
+    : `<div class="msg-content">${renderAssistantContentHTML(msg, false)}</div>`;
   const metaParts = [];
   if (msg.model) metaParts.push(`<span style="color:var(--accent);background:rgba(108,99,255,.1);padding:1px 7px;border-radius:10px">${escHtml(msg.model)}</span>`);
   if (msg.tokens) metaParts.push(`↑${msg.tokens.prompt_tokens||0} ↓${msg.tokens.completion_tokens||0} · total ${msg.tokens.total_tokens||0}`);
@@ -1446,6 +1452,16 @@ function buildMsgHTML(msg, idx) {
         </div>
       </div>
     </div>`;
+}
+
+// Render assistant message content with optional thinking (collapsed by default)
+function renderAssistantContentHTML(msg, thinkingOpen) {
+  const thinking = msg.thinking || '';
+  const content = msg.content || '';
+  const thinkingHtml = thinking
+    ? `<details${thinkingOpen ? ' open' : ''}><summary>Thinking</summary>${marked.parse(thinking)}</details>`
+    : '';
+  return `${thinkingHtml}${content ? marked.parse(content) : ''}`;
 }
 
 function appendMsgRow(msg, idx) {
@@ -1486,7 +1502,7 @@ async function sendMessage() {
   input.value = '';
   input.style.height = 'auto';
 
-  const assistantMsg = { role: 'assistant', content: '', time: Date.now(), model: settings.model };
+  const assistantMsg = { role: 'assistant', content: '', thinking: '', hasThinking: false, time: Date.now(), model: settings.model };
   conv.messages.push(assistantMsg);
   appendMsgRow(assistantMsg, conv.messages.length - 1);
 
@@ -1507,7 +1523,7 @@ async function sendMessage() {
     }
   } finally {
     contentEl.classList.remove('streaming-cursor');
-    contentEl.innerHTML = marked.parse(assistantMsg.content);
+    contentEl.innerHTML = renderAssistantContentHTML(assistantMsg, false);
     updateMsgMeta(contentEl, assistantMsg);
     setSendStop(false);
     abortController = null;
@@ -1548,9 +1564,12 @@ async function callAPI(conv, contentEl, assistantMsg, activeKey) {
     await readStream(resp, contentEl, assistantMsg);
   } else {
     const data = await resp.json();
-    assistantMsg.content = data.choices[0].message.content || '';
+    const message = data.choices?.[0]?.message || {};
+    assistantMsg.content = message.content || '';
+    assistantMsg.thinking = message.reasoning_content || message.reasoning || message.thought || '';
+    assistantMsg.hasThinking = !!assistantMsg.thinking;
     if (data.usage) assistantMsg.tokens = data.usage;
-    contentEl.innerHTML = marked.parse(assistantMsg.content);
+    contentEl.innerHTML = renderAssistantContentHTML(assistantMsg, false);
   }
 }
 
@@ -1558,6 +1577,26 @@ async function readStream(resp, contentEl, assistantMsg) {
   const reader  = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+
+  const RENDER_INTERVAL_MS = 80;
+  let renderScheduled = false;
+  let lastRenderAt = 0;
+
+  const requestRender = () => {
+    if (renderScheduled) return;
+    renderScheduled = true;
+    const now = Date.now();
+    const wait = Math.max(0, RENDER_INTERVAL_MS - (now - lastRenderAt));
+    setTimeout(() => {
+      renderScheduled = false;
+      lastRenderAt = Date.now();
+      contentEl.innerHTML = renderAssistantContentHTML(assistantMsg, true);
+      $('#messages').scrollTop = $('#messages').scrollHeight;
+    }, wait);
+  };
+
+  // Initial render (thinking open while streaming)
+  contentEl.innerHTML = renderAssistantContentHTML(assistantMsg, true);
 
   while (true) {
     const { done, value } = await reader.read();
@@ -1572,12 +1611,24 @@ async function readStream(resp, contentEl, assistantMsg) {
       if (data === '[DONE]') return;
       try {
         const json  = JSON.parse(data);
-        const delta = json.choices?.[0]?.delta?.content;
-        if (delta) {
-          assistantMsg.content += delta;
-          contentEl.innerHTML = marked.parse(assistantMsg.content);
-          $('#messages').scrollTop = $('#messages').scrollHeight;
+        const delta = json.choices?.[0]?.delta || {};
+        const deltaContent = delta.content;
+        const deltaThinking =
+          delta.reasoning_content ??
+          delta.reasoning ??
+          delta.thought;
+
+        if (typeof deltaContent === 'string' && deltaContent) {
+          assistantMsg.content += deltaContent;
+          requestRender();
         }
+
+        if (typeof deltaThinking === 'string' && deltaThinking) {
+          assistantMsg.thinking += deltaThinking;
+          assistantMsg.hasThinking = true;
+          requestRender();
+        }
+
         if (json.usage) assistantMsg.tokens = json.usage;
       } catch(_) {}
     }
@@ -1595,7 +1646,7 @@ async function regenFrom(idx) {
   if (!activeKey) { toast('No active API key'); return; }
   if (!settings.model) { toast('Select a model above the chat box'); return; }
 
-  const assistantMsg = { role: 'assistant', content: '', time: Date.now(), model: settings.model };
+  const assistantMsg = { role: 'assistant', content: '', thinking: '', hasThinking: false, time: Date.now(), model: settings.model };
   conv.messages.push(assistantMsg);
   appendMsgRow(assistantMsg, conv.messages.length - 1);
   const lastRow   = $('#messages').lastElementChild;
@@ -1610,7 +1661,7 @@ async function regenFrom(idx) {
     if (e.name !== 'AbortError') assistantMsg.content = `**Error:** ${friendlyError(e)}`;
   } finally {
     contentEl.classList.remove('streaming-cursor');
-    contentEl.innerHTML = marked.parse(assistantMsg.content);
+    contentEl.innerHTML = renderAssistantContentHTML(assistantMsg, false);
     updateMsgMeta(contentEl, assistantMsg);
     setSendStop(false);
     abortController = null;
@@ -1796,14 +1847,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       const gi = parseInt(delGroup.dataset.gi);
       if (!confirm(`Delete group "${getPresets()[gi].label}"?`)) return;
       ensureCustomPresets();
+      const groupModels = settings.presets[gi]?.models || [];
       settings.presets.splice(gi, 1);
+      if (!Array.isArray(settings.thinkingModels)) settings.thinkingModels = [];
+      settings.thinkingModels = settings.thinkingModels.filter(m => !groupModels.includes(m));
       persistSettings(); renderPresetList(); refreshPresetsDropdowns();
       return;
     }
     if (delModel) {
       const gi = parseInt(delModel.dataset.gi), mi = parseInt(delModel.dataset.mi);
       ensureCustomPresets();
+      const deletedModel = settings.presets[gi]?.models?.[mi];
       settings.presets[gi].models.splice(mi, 1);
+      if (!Array.isArray(settings.thinkingModels)) settings.thinkingModels = [];
+      if (deletedModel) settings.thinkingModels = settings.thinkingModels.filter(m => m !== deletedModel);
       persistSettings(); renderPresetList(); refreshPresetsDropdowns();
       // Re-expand group
       const g = document.querySelector(`.preset-group[data-gi="${gi}"] .preset-group-body`);
@@ -1816,7 +1873,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       const model = inp.value.trim();
       if (!model) return;
       ensureCustomPresets();
-      if (!settings.presets[gi].models.includes(model)) settings.presets[gi].models.push(model);
+      const isNew = !settings.presets[gi].models.includes(model);
+      if (isNew) {
+        settings.presets[gi].models.push(model);
+        if (!Array.isArray(settings.thinkingModels)) settings.thinkingModels = [];
+        if (confirm(`Mark "${model}" as a thinking model (may output reasoning/thought)?`)) {
+          if (!settings.thinkingModels.includes(model)) settings.thinkingModels.push(model);
+        }
+      }
       persistSettings(); renderPresetList(); refreshPresetsDropdowns();
       // Re-expand group
       const g = document.querySelector(`.preset-group[data-gi="${gi}"] .preset-group-body`);
@@ -1899,6 +1963,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#btn-reset-presets').addEventListener('click', () => {
     if (!confirm('Reset to built-in defaults? All custom presets will be lost.')) return;
     settings.presets = null;
+    settings.thinkingModels = [];
     persistSettings(); renderPresetList(); refreshPresetsDropdowns();
     toast('Presets reset to defaults');
   });

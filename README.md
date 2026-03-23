@@ -36,3 +36,9 @@ This project provides a simple, local web interface and backend to test your API
 - UI update: move the model selector to sit above the chat input box.
 - Remove per-API-key “Default Model” logic: API keys no longer carry a default model; model is global.
 - UX: disable the `Send` button until a valid model is selected; improve empty-state guidance.
+
+### v1.2
+- Thinking display (Rule A): when `stream` delta includes `reasoning_content/reasoning/thought`, show a streaming `<details>` "Thinking" section and collapse it when done.
+- Stream stability: throttle UI re-render during streaming to avoid bursty/jerky updates.
+- Server streaming granularity: reduce proxy chunk size to improve SSE token pacing.
+- Model presets UX: when adding a new model in Settings -> Model Presets, prompt to mark it as a thinking-capable model (stored in `settings.thinkingModels`).
