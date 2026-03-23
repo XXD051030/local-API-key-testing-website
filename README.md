@@ -23,7 +23,7 @@ This project provides a simple, local web interface and backend to test your API
 * `server.py`: The backend script for handling API key testing.
 
 ## Updates
-### v1.0.1
+### v1.0.1 23
 - Harden frontend rendering: make `marked` code-block rendering compatible across marked versions.
 - Security hardening: escape `${` when generating `Copy` button template strings to reduce injection risk.
 - UX/stability: add `maxlength` to the message input to avoid huge requests/rendering overhead.
@@ -38,7 +38,7 @@ This project provides a simple, local web interface and backend to test your API
 - UX: disable the `Send` button until a valid model is selected; improve empty-state guidance.
 
 ### v1.2
-- Thinking display (Rule A): when `stream` delta includes `reasoning_content/reasoning/thought`, show a streaming `<details>` "Thinking" section and collapse it when done.
+- Thinking display: when `stream` delta includes `reasoning_content/reasoning/thought`, show a streaming `<details>` "Thinking" section and collapse it when done.
 - Stream stability: throttle UI re-render during streaming to avoid bursty/jerky updates.
 - Server streaming granularity: reduce proxy chunk size to improve SSE token pacing.
 - Model presets UX: when adding a new model in Settings -> Model Presets, prompt to mark it as a thinking-capable model (stored in `settings.thinkingModels`).
@@ -47,3 +47,7 @@ This project provides a simple, local web interface and backend to test your API
 - Key-bound models: model selection is now bound to the active API key (chat dropdown only shows models for the selected key).
 - Thinking styling: make the "Thinking" area visually distinct with muted colors/borders.
 - UI hint: add a small label next to the `key-selector` so users know it controls the active API key.
+
+### v1.3.1
+- Thinking collapse fix: when streaming ends, the "Thinking" section now reliably collapses immediately.
+- Gentle thinking mark: adding a model in Settings now uses an inline checkbox (no blocking `confirm()` popup).
