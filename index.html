@@ -784,6 +784,15 @@ body {
   align-items: center;
 }
 
+.preset-thinking-mark {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text3);
+  white-space: nowrap;
+}
+
 /* Toast */
 #toast {
   position: fixed;
@@ -1097,6 +1106,9 @@ function renderPresetList() {
         <div class="preset-add-row">
           <input class="field-input preset-new-model" type="text" placeholder="model name..." spellcheck="false" style="font-size:12px;padding:5px 8px">
           <button class="btn-secondary preset-add-model-btn" data-gi="${gi}" style="padding:5px 10px;font-size:12px;flex-shrink:0">Add</button>
+          <label class="preset-thinking-mark" title="Whether this model may output reasoning/thought">
+            <input type="checkbox" class="preset-thinking-flag"> Thinking
+          </label>
         </div>
       </div>
     </div>`).join('');
@@ -1636,20 +1648,37 @@ async function readStream(resp, contentEl, assistantMsg) {
   let buffer = '';
 
   const RENDER_INTERVAL_MS = 80;
-  let renderScheduled = false;
   let lastRenderAt = 0;
+  let renderTimerId = null;
+  let thinkingDetailsOpen = true;
+  let streamFinished = false;
+
+  const renderNow = () => {
+    lastRenderAt = Date.now();
+    contentEl.innerHTML = renderAssistantContentHTML(assistantMsg, thinkingDetailsOpen);
+    $('#messages').scrollTop = $('#messages').scrollHeight;
+  };
 
   const requestRender = () => {
-    if (renderScheduled) return;
-    renderScheduled = true;
+    if (streamFinished) return;
+    if (renderTimerId) return;
     const now = Date.now();
     const wait = Math.max(0, RENDER_INTERVAL_MS - (now - lastRenderAt));
-    setTimeout(() => {
-      renderScheduled = false;
-      lastRenderAt = Date.now();
-      contentEl.innerHTML = renderAssistantContentHTML(assistantMsg, true);
-      $('#messages').scrollTop = $('#messages').scrollHeight;
+    renderTimerId = setTimeout(() => {
+      renderTimerId = null;
+      renderNow();
     }, wait);
+  };
+
+  const finishStream = () => {
+    if (streamFinished) return;
+    streamFinished = true;
+    thinkingDetailsOpen = false;
+    if (renderTimerId) {
+      clearTimeout(renderTimerId);
+      renderTimerId = null;
+    }
+    renderNow();
   };
 
   // Initial render (thinking open while streaming)
@@ -1657,7 +1686,10 @@ async function readStream(resp, contentEl, assistantMsg) {
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      finishStream();
+      break;
+    }
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split('\n');
     buffer = lines.pop();
@@ -1665,7 +1697,10 @@ async function readStream(resp, contentEl, assistantMsg) {
     for (const line of lines) {
       if (!line.startsWith('data: ')) continue;
       const data = line.slice(6).trim();
-      if (data === '[DONE]') return;
+      if (data === '[DONE]') {
+        finishStream();
+        return;
+      }
       try {
         const json  = JSON.parse(data);
         const delta = json.choices?.[0]?.delta || {};
@@ -1677,12 +1712,17 @@ async function readStream(resp, contentEl, assistantMsg) {
 
         if (typeof deltaContent === 'string' && deltaContent) {
           assistantMsg.content += deltaContent;
+          // If we already have thinking content, collapse it as soon as output starts.
+          if (assistantMsg.thinking && thinkingDetailsOpen) {
+            thinkingDetailsOpen = false;
+          }
           requestRender();
         }
 
         if (typeof deltaThinking === 'string' && deltaThinking) {
           assistantMsg.thinking += deltaThinking;
           assistantMsg.hasThinking = true;
+          thinkingDetailsOpen = true;
           requestRender();
         }
 
@@ -1935,9 +1975,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (isNew) {
         settings.presets[gi].models.push(model);
         if (!Array.isArray(settings.thinkingModels)) settings.thinkingModels = [];
-        if (confirm(`Mark "${model}" as a thinking model (may output reasoning/thought)?`)) {
-          if (!settings.thinkingModels.includes(model)) settings.thinkingModels.push(model);
-        }
+        const row = addModel.closest('.preset-add-row');
+        const thinkingFlag = row?.querySelector('.preset-thinking-flag')?.checked;
+        if (thinkingFlag && !settings.thinkingModels.includes(model)) settings.thinkingModels.push(model);
       }
       persistSettings(); renderPresetList(); refreshPresetsDropdowns();
       // Re-expand group
