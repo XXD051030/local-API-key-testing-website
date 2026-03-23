@@ -52,7 +52,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _file_read(self, name):
         if name not in ALLOWED_FILES:
             self.send_response(403)
+            self._cors()
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
+            self.wfile.write(json.dumps({'error': {'message': 'Forbidden file'}}).encode())
             return
         filepath = os.path.join(BASE_DIR, name)
         if not os.path.exists(filepath):
@@ -72,12 +75,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _file_write(self, name):
         if name not in ALLOWED_FILES:
             self.send_response(403)
+            self._cors()
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
+            self.wfile.write(json.dumps({'error': {'message': 'Forbidden file'}}).encode())
             return
         length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(length)
         filepath = os.path.join(BASE_DIR, name)
-        data = json.loads(body)
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError as e:
+            self.send_response(400)
+            self._cors()
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(json.dumps({'error': {'message': f'Invalid JSON: {str(e)}'}}).encode())
+            return
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(json.dumps(data, indent=2, ensure_ascii=False))
         self.send_response(200)
@@ -100,7 +114,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             )
 
             try:
-                resp = urllib.request.urlopen(req)
+                resp = urllib.request.urlopen(req, timeout=30)
                 content_type = resp.headers.get('Content-Type', 'application/json')
                 self.send_response(resp.status)
                 self.send_header('Content-Type', content_type)

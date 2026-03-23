@@ -21,3 +21,12 @@ This project provides a simple, local web interface and backend to test your API
 
 * `index.html`: The main frontend interface.
 * `server.py`: The backend script for handling API key testing.
+
+## Updates
+### v1.0.1
+- Harden frontend rendering: make `marked` code-block rendering compatible across marked versions.
+- Security hardening: escape `${` when generating `Copy` button template strings to reduce injection risk.
+- UX/stability: add `maxlength` to the message input to avoid huge requests/rendering overhead.
+- Improve local server robustness: add CORS headers + JSON error body for forbidden `/file` reads/writes.
+- Improve local server robustness: return `400 Invalid JSON` for malformed `/file` payloads.
+- Stability: add `timeout=30` to the upstream proxy request to prevent hanging.
