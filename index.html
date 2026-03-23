@@ -403,7 +403,7 @@ body {
   text-align: center;
   padding: 40px;
 }
-.es-icon { font-size: 40px; opacity: .25; }
+.es-icon { font-size: 48px; opacity: .4; font-weight: 700; letter-spacing: 2px; }
 #empty-state h2 { font-size: 17px; color: var(--text2); font-weight: 500; }
 #empty-state p { font-size: 13px; line-height: 1.6; max-width: 300px; }
 
@@ -865,7 +865,7 @@ body {
   <!-- Messages -->
   <div id="messages">
     <div id="empty-state">
-      <div class="es-icon">✦</div>
+      <div class="es-icon">XXD</div>
       <h2>Start a Conversation</h2>
       <p>Add an API key in Settings, select a model above the chat box, then type a message below.</p>
     </div>
@@ -1273,12 +1273,27 @@ function saveKeyFromForm(form) {
     if (settings.apiKeys.length === 1) {
       settings.activeKeyId = newK.id;
     }
+
+    ensureCustomPresets();
+
+    const formModelInput = form.querySelector('.kf-model');
+    const initialModel = formModelInput ? formModelInput.value.trim() : '';
+    if (initialModel) {
+      const group = settings.presets.find(p => p.keyId === newK.id);
+      if (group && !group.models.includes(initialModel)) {
+        group.models.push(initialModel);
+      }
+      const thinkingFlag = form.querySelector('.kf-thinking-flag');
+      if (thinkingFlag?.checked) {
+        if (!Array.isArray(settings.thinkingModels)) settings.thinkingModels = [];
+        if (!settings.thinkingModels.includes(initialModel)) settings.thinkingModels.push(initialModel);
+      }
+    }
   } else {
     const existing = settings.apiKeys.find(k => k.id === editId);
     if (existing) { existing.name = name; existing.baseUrl = url; existing.key = key; }
+    ensureCustomPresets();
   }
-
-  ensureCustomPresets();
 
   editingKeyId = null;
   persistSettings();
@@ -1292,9 +1307,26 @@ function saveKeyFromForm(form) {
 async function testKeyFromForm(form) {
   const url   = form.querySelector('.kf-url').value.trim().replace(/\/$/, '');
   const key   = form.querySelector('.kf-key').value.trim();
-  const model = settings.model || '';
+  const editId = form.dataset.editing;
+  const chatModel = settings.model || '';
 
-  if (!url || !key || !model) { toast('Select a model above the chat box (or add models in Settings -> Model Presets)'); return; }
+  if (!url || !key) { toast('Base URL and API Key are required'); return; }
+
+  let modelToUse = '';
+  if (editId === 'new') {
+    const formModelInput = form.querySelector('.kf-model');
+    modelToUse = formModelInput ? formModelInput.value.trim() : '';
+    if (!modelToUse) { toast('Enter a model name above to test this connection'); return; }
+  } else {
+    const group = Array.isArray(settings.presets) ? settings.presets.find(p => p.keyId === editId) || null : null;
+    const models = group?.models || [];
+    modelToUse = models.find(m => m === chatModel) || models[0] || '';
+  }
+
+  if (!modelToUse) {
+    toast('This key has no models yet. Add at least one model in Settings -> Model Presets, then try Test Connection again');
+    return;
+  }
 
   const statusEl = form.querySelector('.kf-test-status');
   const testBtn  = form.querySelector('.kf-test-btn');
@@ -1303,25 +1335,34 @@ async function testKeyFromForm(form) {
   statusEl.innerHTML = '<span class="status-dot"></span> Testing...';
   testBtn.disabled = true;
 
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 20000);
+
   try {
     const resp = await proxyFetch(`${url}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({ model, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 1, stream: false }),
+      body: JSON.stringify({ model: modelToUse, messages: [{ role: 'user', content: 'Hi' }], max_tokens: 1, stream: false }),
+      signal: ac.signal,
     });
+    clearTimeout(timer);
     if (resp.ok || resp.status === 400) {
-      // 400 can happen with certain models but means the endpoint is alive and auth passed
       statusEl.className = 'kf-test-status status-badge show ok';
       statusEl.innerHTML = '<span class="status-dot"></span> Connected ✓';
     } else {
-      const j = await resp.json().catch(() => ({}));
-      const msg = j.error?.message || `HTTP ${resp.status}`;
+      let errMsg = `HTTP ${resp.status}`;
+      try {
+        const t = await Promise.race([resp.text(), new Promise((_, r) => setTimeout(() => r('timeout'), 5000))]);
+        const j = JSON.parse(t);
+        if (j.error?.message) errMsg = j.error.message;
+      } catch(_) {}
       statusEl.className = 'kf-test-status status-badge show err';
-      statusEl.innerHTML = `<span class="status-dot"></span> ${escHtml(msg)}`;
+      statusEl.innerHTML = `<span class="status-dot"></span> ${escHtml(errMsg)}`;
     }
   } catch(e) {
+    clearTimeout(timer);
     statusEl.className = 'kf-test-status status-badge show err';
-    const msg = friendlyError(e);
+    const msg = e.name === 'AbortError' ? 'Connection timed out (20s)' : friendlyError(e);
     statusEl.style.cssText += ';white-space:pre-wrap;max-width:100%;border-radius:6px;padding:8px 10px';
     statusEl.innerHTML = `<span class="status-dot" style="flex-shrink:0"></span> <span>${escHtml(msg)}</span>`;
   } finally {
@@ -1448,6 +1489,16 @@ function buildKeyForm(k) {
           <button class="btn-secondary kf-toggle-key" type="button" style="flex-shrink:0">Show</button>
         </div>
       </div>
+      ${isNew ? `
+      <div class="field-group">
+        <label class="field-label">Initial Model <span style="font-weight:400;color:var(--text3)">(optional, for testing)</span></label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="field-input kf-model" type="text" placeholder="e.g. gpt-4o" spellcheck="false" style="flex:1">
+          <label class="preset-thinking-mark" title="Mark as thinking-capable model">
+            <input type="checkbox" class="kf-thinking-flag"> Thinking
+          </label>
+        </div>
+      </div>` : ''}
       <div class="key-form-test">
         <button class="btn-secondary kf-test-btn" type="button">Test Connection</button>
         <div class="kf-test-status status-badge"></div>
@@ -1481,7 +1532,7 @@ function renderMessages() {
   if (!conv || !conv.messages.length) {
     container.innerHTML = `
       <div id="empty-state">
-        <div class="es-icon">✦</div>
+        <div class="es-icon">XXD</div>
         <h2>${conv ? 'Start the conversation' : 'Select or create a chat'}</h2>
         <p>${conv ? 'Type a message below to begin. Make sure a model is selected above.' : 'Use the sidebar to manage conversations.'}</p>
       </div>`;

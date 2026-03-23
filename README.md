@@ -51,3 +51,13 @@ This project provides a simple, local web interface and backend to test your API
 ### v1.3.1
 - Thinking collapse fix: when streaming ends, the "Thinking" section now reliably collapses immediately.
 - Gentle thinking mark: adding a model in Settings now uses an inline checkbox (no blocking `confirm()` popup).
+
+### v1.3.2
+- Test Connection now auto-uses the first model bound to the tested key (no longer depends on the chat model selector).
+- Block Test Connection for unsaved (draft) keys with a clear toast guiding the user to save first.
+- UI: replace the center empty-state logo with "XXD" branding.
+
+### v1.3.2.1
+- Add Key testing: draft keys now include an optional "Initial Model" so you can Test Connection immediately (without filling the chat model).
+- Saving draft keys: the optional "Initial Model" is written into that key's bound preset group (and optionally marked as Thinking).
+- Stability: `Test Connection` uses a 20-second timeout to avoid the page freezing.
