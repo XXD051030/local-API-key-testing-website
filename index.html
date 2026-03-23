@@ -179,32 +179,34 @@ body {
 #key-selector:focus { border-color: var(--accent); }
 #key-selector option { background: var(--bg3); }
 
-#model-input {
-  flex: 1;
-  max-width: 260px;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  padding: 6px 10px;
-  font-size: 13px;
-  outline: none;
-  transition: border-color .15s;
+#model-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 8px;
 }
-#model-input:focus { border-color: var(--accent); }
-#model-input::placeholder { color: var(--text3); }
-
-#model-presets {
+.model-bar-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  flex-shrink: 0;
+}
+#model-selector {
+  flex: 1;
   background: var(--bg3);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text2);
-  padding: 6px 8px;
+  padding: 6px 10px;
   font-size: 12px;
   outline: none;
   cursor: pointer;
+  max-width: 420px;
 }
-#model-presets option { background: var(--bg3); }
+#model-selector:focus { border-color: var(--accent); }
+#model-selector option { background: var(--bg3); }
 
 .topbar-right { margin-left: auto; display: flex; gap: 6px; }
 
@@ -431,6 +433,7 @@ body {
 #send-btn:hover { background: var(--accent-h); }
 #send-btn.stop { background: var(--danger); }
 #send-btn.stop:hover { background: #e86060; }
+#send-btn:disabled { opacity: .45; cursor: not-allowed; }
 
 #input-hint { font-size: 11px; color: var(--text3); margin-top: 6px; padding: 0 4px; }
 
@@ -814,10 +817,6 @@ body {
   <div id="topbar">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" style="flex-shrink:0"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
     <select id="key-selector" title="Active API Key"></select>
-    <input id="model-input" type="text" placeholder="Model name (e.g. gpt-4o)" spellcheck="false">
-    <select id="model-presets" title="Quick model select">
-      <option value="">Presets...</option>
-    </select>
     <div class="topbar-right">
       <button class="icon-btn" id="btn-regen" style="display:none" title="Regenerate last reply">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
@@ -835,12 +834,18 @@ body {
     <div id="empty-state">
       <div class="es-icon">✦</div>
       <h2>Start a Conversation</h2>
-      <p>Add an API key in Settings, then type a message below.</p>
+      <p>Add an API key in Settings, select a model above the chat box, then type a message below.</p>
     </div>
   </div>
 
   <!-- Input -->
   <div id="input-area">
+    <div id="model-bar">
+      <span class="model-bar-label">Model</span>
+      <select id="model-selector" title="Select model">
+        <option value="">Select a model...</option>
+      </select>
+    </div>
     <div id="input-wrap">
       <textarea id="user-input" rows="1" maxlength="20000" placeholder="Type a message..."></textarea>
       <button id="send-btn">Send</button>
@@ -1009,10 +1014,21 @@ function buildPresetsHTML() {
 }
 
 function refreshPresetsDropdowns() {
-  $('#model-presets').innerHTML = `<option value="">Presets...</option>${buildPresetsHTML()}`;
-  // Refresh any open key form's preset select
-  const openFormSel = document.querySelector('.kf-model-preset');
-  if (openFormSel) openFormSel.innerHTML = `<option value="">Preset</option>${buildPresetsHTML()}`;
+  const sel = $('#model-selector');
+  if (!sel) return;
+
+  const current = settings.model || '';
+  sel.innerHTML = `<option value="">Select a model...</option>${buildPresetsHTML()}`;
+
+  const presets = getPresets();
+  const valid = current && presets.some(g => g.models.includes(current));
+  if (valid) sel.value = current;
+  else {
+    settings.model = '';
+    sel.value = '';
+  }
+
+  syncSendButton();
 }
 
 function renderPresetList() {
@@ -1044,7 +1060,7 @@ function renderPresetList() {
 // ── State ─────────────────────────────────────────────────────────────────────
 let settings = {
   activeKeyId: null,
-  apiKeys: [],        // [{id, name, baseUrl, key, defaultModel}]
+  apiKeys: [],        // [{id, name, baseUrl, key}]
   model: '',
   systemPrompt: '',
   temperature: 0.7,
@@ -1117,7 +1133,9 @@ function applySettingsToUI() {
   $('#temp-val').textContent  = settings.temperature ?? 0.7;
   $('#s-max-tokens').value    = settings.maxTokens || '';
   $('#s-stream').value        = (settings.stream !== false).toString();
-  $('#model-input').value     = settings.model || '';
+
+  refreshPresetsDropdowns();
+
   renderKeySelector();
   renderKeyList();
   renderPresetList();
@@ -1128,7 +1146,7 @@ function readGeneralFromUI() {
   settings.temperature  = parseFloat($('#s-temperature').value);
   settings.maxTokens    = $('#s-max-tokens').value;
   settings.stream       = $('#s-stream').value === 'true';
-  settings.model        = $('#model-input').value.trim();
+  settings.model        = $('#model-selector').value;
 }
 
 // ── Conversations persistence ─────────────────────────────────────────────────
@@ -1171,7 +1189,6 @@ function deleteKey(id) {
 function saveKeyFromForm(form) {
   const name  = form.querySelector('.kf-name').value.trim();
   const url   = form.querySelector('.kf-url').value.trim().replace(/\/$/, '');
-  const model = form.querySelector('.kf-model').value.trim();
   const key   = form.querySelector('.kf-key').value.trim();
 
   if (!name)  { toast('Name is required'); return; }
@@ -1180,31 +1197,29 @@ function saveKeyFromForm(form) {
 
   const editId = form.dataset.editing;
   if (editId === 'new') {
-    const newK = { id: 'key_' + Date.now(), name, baseUrl: url, key, defaultModel: model };
+    const newK = { id: 'key_' + Date.now(), name, baseUrl: url, key };
     settings.apiKeys.push(newK);
     if (settings.apiKeys.length === 1) {
       settings.activeKeyId = newK.id;
-      if (model && !settings.model) settings.model = model;
     }
   } else {
     const existing = settings.apiKeys.find(k => k.id === editId);
-    if (existing) { existing.name = name; existing.baseUrl = url; existing.key = key; existing.defaultModel = model; }
+    if (existing) { existing.name = name; existing.baseUrl = url; existing.key = key; }
   }
 
   editingKeyId = null;
   persistSettings();
   renderKeyList();
   renderKeySelector();
-  applyModelInput();
   toast('Key saved');
 }
 
 async function testKeyFromForm(form) {
   const url   = form.querySelector('.kf-url').value.trim().replace(/\/$/, '');
   const key   = form.querySelector('.kf-key').value.trim();
-  const model = form.querySelector('.kf-model').value.trim();
+  const model = settings.model || '';
 
-  if (!url || !key || !model) { toast('Fill in Base URL, API Key and Default Model to test'); return; }
+  if (!url || !key || !model) { toast('Select a model above the chat box (or add models in Settings -> Model Presets)'); return; }
 
   const statusEl = form.querySelector('.kf-test-status');
   const testBtn  = form.querySelector('.kf-test-btn');
@@ -1298,18 +1313,15 @@ function renderKeySelector() {
 }
 
 function applyModelInput() {
-  const key = getActiveKey();
-  if (!key) return;
-  const model = key.defaultModel || '';
-  $('#model-input').value = model;
-  settings.model = model;
+  // Model selection is controlled by #model-selector (presets-only).
+  // This function is kept for backward compatibility with older code paths.
 }
 
 function renderKeyList() {
   const container = $('#key-list');
   let html = '';
 
-  if (editingKeyId === 'new') html += buildKeyForm({ id: 'new', name: '', baseUrl: '', key: '', defaultModel: '' });
+  if (editingKeyId === 'new') html += buildKeyForm({ id: 'new', name: '', baseUrl: '', key: '' });
 
   if (!settings.apiKeys.length && editingKeyId !== 'new') {
     html += '<div class="key-empty">No API keys yet. Click "+ Add Key" above.</div>';
@@ -1332,7 +1344,6 @@ function buildKeyItem(k) {
         <div class="key-item-name">${escHtml(k.name)}</div>
         <div class="key-item-meta">
           <span class="key-item-url">${escHtml(urlShort)}</span>
-          ${k.defaultModel ? `<span class="key-item-model">${escHtml(k.defaultModel)}</span>` : ''}
         </div>
         <div class="key-item-masked">${masked}</div>
       </div>
@@ -1345,7 +1356,6 @@ function buildKeyItem(k) {
 
 function buildKeyForm(k) {
   const isNew = k.id === 'new';
-  const presetsHTML = buildPresetsHTML();
   return `
     <div class="key-form" data-editing="${escHtml(k.id)}">
       <div class="field-group">
@@ -1355,16 +1365,6 @@ function buildKeyForm(k) {
       <div class="field-group">
         <label class="field-label">Base URL</label>
         <input class="field-input kf-url" type="text" value="${escHtml(k.baseUrl)}" placeholder="https://api.openai.com/v1" spellcheck="false">
-      </div>
-      <div class="field-group">
-        <label class="field-label">Default Model</label>
-        <div class="row-group">
-          <input class="field-input kf-model" type="text" value="${escHtml(k.defaultModel || '')}" placeholder="e.g. gpt-4o" spellcheck="false">
-          <select class="field-select kf-model-preset" style="width:80px;flex-shrink:0;padding:8px 4px" onchange="if(this.value){this.closest('.row-group').querySelector('.kf-model').value=this.value;this.value=''}">
-            <option value="">Preset</option>
-            ${presetsHTML}
-          </select>
-        </div>
       </div>
       <div class="field-group">
         <label class="field-label">API Key</label>
@@ -1408,7 +1408,7 @@ function renderMessages() {
       <div id="empty-state">
         <div class="es-icon">✦</div>
         <h2>${conv ? 'Start the conversation' : 'Select or create a chat'}</h2>
-        <p>${conv ? 'Type a message below to begin.' : 'Use the sidebar to manage conversations.'}</p>
+        <p>${conv ? 'Type a message below to begin. Make sure a model is selected above.' : 'Use the sidebar to manage conversations.'}</p>
       </div>`;
     return;
   }
@@ -1471,7 +1471,7 @@ async function sendMessage() {
 
   const activeKey = getActiveKey();
   if (!activeKey) { toast('Add an API key in Settings first'); openSettings(); return; }
-  if (!settings.model) { toast('Enter a model name in the top bar'); return; }
+  if (!settings.model) { toast('Select a model above the chat box'); return; }
 
   if (!activeConvId) newConv();
   const conv = activeConv();
@@ -1593,7 +1593,7 @@ async function regenFrom(idx) {
   // Re-trigger send using trimmed conv
   const activeKey = getActiveKey();
   if (!activeKey) { toast('No active API key'); return; }
-  if (!settings.model) { toast('Enter a model name'); return; }
+  if (!settings.model) { toast('Select a model above the chat box'); return; }
 
   const assistantMsg = { role: 'assistant', content: '', time: Date.now(), model: settings.model };
   conv.messages.push(assistantMsg);
@@ -1693,10 +1693,17 @@ function copyText(btn, text) {
     setTimeout(() => btn.textContent = o, 1500);
   });
 }
+function syncSendButton() {
+  const b = $('#send-btn');
+  if (!b) return;
+  // When streaming (stop mode), keep it clickable even if model gets cleared.
+  b.disabled = !abortController && !settings.model;
+}
 function setSendStop(stop) {
   const b = $('#send-btn');
   b.textContent = stop ? 'Stop' : 'Send';
   b.classList.toggle('stop', stop);
+  b.disabled = !stop && !settings.model;
 }
 function openSettings()  { $('#settings-drawer').classList.add('open');  $('#overlay').classList.add('show'); }
 function closeSettings() { $('#settings-drawer').classList.remove('open'); $('#overlay').classList.remove('show'); }
@@ -1727,9 +1734,6 @@ function autoResize(el) {
 
 // ── Events ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  // Populate model presets in topbar
-  $('#model-presets').innerHTML = `<option value="">Presets...</option>${buildPresetsHTML()}`;
-
   await init();
 
   // Sidebar
@@ -1746,22 +1750,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Topbar — key selector
   $('#key-selector').addEventListener('change', e => {
     settings.activeKeyId = e.target.value || null;
-    applyModelInput();
+    renderKeyList();
+    renderKeySelector();
     persistSettings();
   });
 
-  // Topbar — model input
-  $('#model-input').addEventListener('blur', () => {
-    settings.model = $('#model-input').value.trim();
+  // Model selector (presets-only)
+  $('#model-selector').addEventListener('change', e => {
+    settings.model = e.target.value;
+    syncSendButton();
     persistSettings();
-  });
-  $('#model-presets').addEventListener('change', e => {
-    if (e.target.value) {
-      $('#model-input').value = e.target.value;
-      settings.model = e.target.value;
-      persistSettings();
-      e.target.value = '';
-    }
   });
 
   // Topbar — regen
@@ -1942,7 +1940,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else if (keyItem && !e.target.closest('.key-item-btns')) {
       // Click on key item to make it active
       settings.activeKeyId = keyItem.dataset.id;
-      applyModelInput();
       persistSettings();
       renderKeyList();
       renderKeySelector();

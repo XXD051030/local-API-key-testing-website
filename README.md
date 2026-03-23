@@ -30,3 +30,9 @@ This project provides a simple, local web interface and backend to test your API
 - Improve local server robustness: add CORS headers + JSON error body for forbidden `/file` reads/writes.
 - Improve local server robustness: return `400 Invalid JSON` for malformed `/file` payloads.
 - Stability: add `timeout=30` to the upstream proxy request to prevent hanging.
+
+### v1.1
+- Presets-only model selection: remove the topbar free-text model input; models must be selected from Settings -> Model Presets.
+- UI update: move the model selector to sit above the chat input box.
+- Remove per-API-key “Default Model” logic: API keys no longer carry a default model; model is global.
+- UX: disable the `Send` button until a valid model is selected; improve empty-state guidance.
