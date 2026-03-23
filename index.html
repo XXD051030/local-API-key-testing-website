@@ -179,6 +179,13 @@ body {
 #key-selector:focus { border-color: var(--accent); }
 #key-selector option { background: var(--bg3); }
 
+.key-selector-hint {
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
 #model-bar {
   display: flex;
   align-items: center;
@@ -366,6 +373,23 @@ body {
   color: var(--accent);
 }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* Thinking: visually distinct from main output */
+.thinking-details {
+  color: var(--text2);
+  background: rgba(255,255,255,.02);
+  border: 1px solid rgba(108,99,255,.18);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+.thinking-details summary {
+  color: var(--text3);
+  font-weight: 600;
+}
+.thinking-details code, .thinking-details pre {
+  color: inherit;
+}
 
 /* Empty state */
 #empty-state {
@@ -815,6 +839,7 @@ body {
 
   <!-- Topbar -->
   <div id="topbar">
+    <span class="key-selector-hint">API Key</span>
     <select id="key-selector" title="Active API Key"></select>
     <div class="topbar-right">
       <button class="icon-btn" id="btn-regen" style="display:none" title="Regenerate last reply">
@@ -915,7 +940,7 @@ body {
     <div>
       <div class="section-header">
         <span class="section-label">Model Presets</span>
-        <button class="icon-btn" id="btn-reset-presets" style="padding:4px 8px;font-size:11px" title="Reset to built-in defaults">Reset</button>
+        <button class="icon-btn" id="btn-reset-presets" style="padding:4px 8px;font-size:11px;display:none" title="Reset to built-in defaults">Reset</button>
       </div>
       <div id="preset-list" style="margin-top:10px;display:flex;flex-direction:column;gap:6px"></div>
       <div id="preset-add-group-row" style="display:none;margin-top:8px" class="row-group">
@@ -923,7 +948,7 @@ body {
         <button class="btn-primary" id="preset-add-group-confirm" style="padding:7px 12px;flex-shrink:0">Add</button>
         <button class="btn-secondary" id="preset-add-group-cancel" style="padding:7px 10px;flex-shrink:0">✕</button>
       </div>
-      <button class="btn-secondary" id="btn-add-preset-group" style="width:100%;margin-top:8px;font-size:12px">+ Add Group</button>
+      <button class="btn-secondary" id="btn-add-preset-group" style="width:100%;margin-top:8px;font-size:12px;display:none">+ Add Group</button>
     </div>
 
     <hr class="section-divider">
@@ -986,30 +1011,46 @@ mdRenderer.code = (...args) => {
 };
 marked.use({ renderer: mdRenderer, breaks: true, gfm: true });
 
-// ── Model presets ─────────────────────────────────────────────────────────────
-const MODEL_GROUPS = [
-  { label: 'OpenAI', models: ['gpt-4o','gpt-4o-mini','gpt-4-turbo','gpt-3.5-turbo','o1','o1-mini','o3-mini'] },
-  { label: 'DeepSeek', models: ['deepseek-chat','deepseek-reasoner'] },
-  { label: 'Anthropic', models: ['claude-opus-4-5','claude-sonnet-4-5','claude-3-5-haiku-latest'] },
-  { label: 'Google', models: ['gemini-2.0-flash','gemini-2.0-pro','gemini-1.5-pro'] },
-  { label: 'NVIDIA', models: ['meta/llama-3.3-70b-instruct','nvidia/llama-3.1-nemotron-70b-instruct','z-ai/glm5','mistralai/mistral-large-2-instruct'] },
-  { label: 'Ollama (local)', models: ['llama3.2','qwen2.5','mistral','deepseek-r1'] },
-];
-
-function getPresets() {
-  return settings.presets || MODEL_GROUPS;
+// ── Key-bound Model presets ───────────────────────────────────────────────────
+function isKeyBoundPresetGroup(g) {
+  return g
+    && typeof g === 'object'
+    && typeof g.keyId === 'string'
+    && typeof g.label === 'string'
+    && Array.isArray(g.models);
 }
 
+function getPresets() {
+  return Array.isArray(settings.presets) ? settings.presets : [];
+}
+
+// Kept for backward compatibility with existing preset-management code paths.
 function ensureCustomPresets() {
-  if (!settings.presets) {
-    settings.presets = MODEL_GROUPS.map(g => ({ label: g.label, models: [...g.models] }));
+  if (!Array.isArray(settings.presets)) settings.presets = [];
+
+  // Discard old preset shapes that do not include keyId.
+  settings.presets = settings.presets.filter(isKeyBoundPresetGroup);
+
+  // Ensure every API key has exactly one preset group.
+  for (const k of settings.apiKeys) {
+    let group = settings.presets.find(p => p.keyId === k.id);
+    if (!group) {
+      group = { label: k.name, keyId: k.id, models: [] };
+      settings.presets.push(group);
+    } else {
+      group.label = k.name;
+      if (!Array.isArray(group.models)) group.models = [];
+    }
   }
 }
 
-function buildPresetsHTML() {
-  return getPresets().map(g =>
-    `<optgroup label="${escHtml(g.label)}">${g.models.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('')}</optgroup>`
-  ).join('');
+function buildPresetsHTML(groups) {
+  const list = Array.isArray(groups) ? groups : getPresets();
+  return list
+    .map(g =>
+      `<optgroup label="${escHtml(g.label)}">${g.models.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('')}</optgroup>`
+    )
+    .join('');
 }
 
 function refreshPresetsDropdowns() {
@@ -1017,10 +1058,11 @@ function refreshPresetsDropdowns() {
   if (!sel) return;
 
   const current = settings.model || '';
-  sel.innerHTML = `<option value="">Select a model...</option>${buildPresetsHTML()}`;
 
-  const presets = getPresets();
-  const valid = current && presets.some(g => g.models.includes(current));
+  const activeGroups = getPresets().filter(g => g.keyId === settings.activeKeyId);
+  sel.innerHTML = `<option value="">Select a model...</option>${buildPresetsHTML(activeGroups)}`;
+
+  const valid = current && activeGroups.some(g => g.models.includes(current));
   if (valid) sel.value = current;
   else {
     settings.model = '';
@@ -1039,7 +1081,6 @@ function renderPresetList() {
         <button class="preset-toggle" title="Expand / Collapse">▶</button>
         <span class="preset-group-label" data-gi="${gi}" title="Click to rename">${escHtml(g.label)}</span>
         <span class="preset-model-count">${g.models.length}</span>
-        <button class="key-act-btn del preset-del-group" data-gi="${gi}" title="Delete group">✕</button>
       </div>
       <div class="preset-group-body" style="display:none">
         ${g.models.length === 0 ? '<div style="font-size:12px;color:var(--text3);padding:3px 2px">No models yet</div>' : ''}
@@ -1070,7 +1111,7 @@ let settings = {
   temperature: 0.7,
   maxTokens: '',
   stream: true,
-  presets: null,      // null = use built-in MODEL_GROUPS
+  presets: [],        // Key-bound model groups: [{label, keyId, models: string[]}]
   thinkingModels: [],
 };
 let conversations = [];
@@ -1130,6 +1171,10 @@ async function loadSettingsFromFile() {
     // Ensure apiKeys is array
     if (!Array.isArray(settings.apiKeys)) settings.apiKeys = [];
     if (!Array.isArray(settings.thinkingModels)) settings.thinkingModels = [];
+    if (!Array.isArray(settings.presets)) settings.presets = [];
+
+    // Discard old presets without keyId and ensure groups exist for keys.
+    ensureCustomPresets();
   }
 }
 
@@ -1187,9 +1232,17 @@ function deleteKey(id) {
     settings.activeKeyId = settings.apiKeys[0]?.id || null;
   }
   if (editingKeyId === id) editingKeyId = null;
+
+  if (Array.isArray(settings.presets)) {
+    settings.presets = settings.presets.filter(p => p.keyId !== id);
+  }
+
+  // If current model belongs to removed key, we will clear it after refresh.
   persistSettings();
   renderKeyList();
   renderKeySelector();
+  refreshPresetsDropdowns();
+  renderPresetList();
 }
 
 function saveKeyFromForm(form) {
@@ -1213,10 +1266,14 @@ function saveKeyFromForm(form) {
     if (existing) { existing.name = name; existing.baseUrl = url; existing.key = key; }
   }
 
+  ensureCustomPresets();
+
   editingKeyId = null;
   persistSettings();
   renderKeyList();
   renderKeySelector();
+  refreshPresetsDropdowns();
+  renderPresetList();
   toast('Key saved');
 }
 
@@ -1459,7 +1516,7 @@ function renderAssistantContentHTML(msg, thinkingOpen) {
   const thinking = msg.thinking || '';
   const content = msg.content || '';
   const thinkingHtml = thinking
-    ? `<details${thinkingOpen ? ' open' : ''}><summary>Thinking</summary>${marked.parse(thinking)}</details>`
+    ? `<details class="thinking-details"${thinkingOpen ? ' open' : ''}><summary>Thinking</summary>${marked.parse(thinking)}</details>`
     : '';
   return `${thinkingHtml}${content ? marked.parse(content) : ''}`;
 }
@@ -1803,6 +1860,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     settings.activeKeyId = e.target.value || null;
     renderKeyList();
     renderKeySelector();
+    refreshPresetsDropdowns();
     persistSettings();
   });
 
@@ -1890,14 +1948,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (label) {
       // Inline rename
       const gi = parseInt(label.dataset.gi);
+      const group = getPresets()[gi];
+      const keyId = group?.keyId;
       const input = document.createElement('input');
       input.className = 'preset-group-label-input';
-      input.value = getPresets()[gi].label;
+      input.value = group?.label || '';
       label.replaceWith(input);
       input.focus(); input.select();
       const save = () => {
         const v = input.value.trim();
-        if (v) { ensureCustomPresets(); settings.presets[gi].label = v; persistSettings(); refreshPresetsDropdowns(); }
+        if (v && keyId) {
+          const k = settings.apiKeys.find(x => x.id === keyId);
+          if (k) k.name = v;
+          ensureCustomPresets();
+          persistSettings();
+          renderKeyList();
+          renderKeySelector();
+          refreshPresetsDropdowns();
+        }
         renderPresetList();
         // Re-expand if was expanded
       };
