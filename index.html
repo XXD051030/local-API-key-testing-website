@@ -1544,13 +1544,6 @@ function renderMessages() {
 
 function buildMsgHTML(msg, idx) {
   const isUser  = msg.role === 'user';
-
-  let displayContent = msg.content;
-  if (!isUser) {
-    const processed = processAssistantMessage(msg);
-    displayContent = processed.content;
-  }
-
   const content = isUser
     ? `<div class="msg-content">${escHtml(msg.content).replace(/\n/g, '<br>')}</div>`
     : `<div class="msg-content">${renderAssistantContentHTML(msg, false)}</div>`;
@@ -1559,7 +1552,7 @@ function buildMsgHTML(msg, idx) {
   if (msg.tokens) metaParts.push(`↑${msg.tokens.prompt_tokens||0} ↓${msg.tokens.completion_tokens||0} · total ${msg.tokens.total_tokens||0}`);
   const tokenInfo = metaParts.length ? `<div class="token-info" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${metaParts.join('')}</div>` : '';
   // Copy button uses backtick template literals: escape `${` to prevent injection
-  const escapedContent = displayContent
+  const escapedContent = msg.content
     .replace(/\\/g, '\\\\')
     .replace(/`/g, '\\`')
     .replace(/\$\{/g, '\\${');
@@ -1582,27 +1575,9 @@ function buildMsgHTML(msg, idx) {
 }
 
 // Render assistant message content with optional thinking (collapsed by default)
-function processAssistantMessage(msg) {
-  let thinking = msg.thinking || '';
-  let content = msg.content || '';
-
-  const thinkRegex = /<think>([\s\S]*?)(?:<\/think>|$)/g;
-  if (content.includes('<think>')) {
-    let extracted = '';
-    content = content.replace(thinkRegex, (m, p1) => {
-      extracted += (extracted ? '\n' : '') + p1.trim();
-      return '';
-    }).trim();
-    if (extracted) {
-      thinking = (thinking ? thinking + '\n\n' : '') + extracted;
-    }
-  }
-
-  return { thinking, content };
-}
-
 function renderAssistantContentHTML(msg, thinkingOpen) {
-  const { thinking, content } = processAssistantMessage(msg);
+  const thinking = msg.thinking || '';
+  const content = msg.content || '';
   const thinkingHtml = thinking
     ? `<details class="thinking-details"${thinkingOpen ? ' open' : ''}><summary>Thinking</summary>${marked.parse(thinking)}</details>`
     : '';
@@ -1728,6 +1703,7 @@ async function readStream(resp, contentEl, assistantMsg) {
   let renderTimerId = null;
   let thinkingDetailsOpen = true;
   let streamFinished = false;
+  let contentStarted = !!assistantMsg.content;
 
   const renderNow = () => {
     lastRenderAt = Date.now();
@@ -1788,24 +1764,10 @@ async function readStream(resp, contentEl, assistantMsg) {
 
         if (typeof deltaContent === 'string' && deltaContent) {
           assistantMsg.content += deltaContent;
-          
-          let currentThinking = assistantMsg.thinking || '';
-          if (assistantMsg.content.includes('<think>')) {
-              const processed = processAssistantMessage(assistantMsg);
-              currentThinking = processed.thinking;
-          }
-
+          contentStarted = true;
           // If we already have thinking content, collapse it as soon as output starts.
-          if (currentThinking && thinkingDetailsOpen) {
-            // Check if we are still inside a think block
-            const lastThinkOpen = assistantMsg.content.lastIndexOf('<think>');
-            const lastThinkClose = assistantMsg.content.lastIndexOf('</think>');
-            const insideThink = lastThinkOpen !== -1 && (lastThinkClose === -1 || lastThinkOpen > lastThinkClose);
-            
-            // Also ensure we have actual content outside of the think block before collapsing
-            if (!insideThink && processAssistantMessage(assistantMsg).content.trim()) {
-               thinkingDetailsOpen = false;
-            }
+          if (assistantMsg.thinking && thinkingDetailsOpen) {
+            thinkingDetailsOpen = false;
           }
           requestRender();
         }
@@ -1813,16 +1775,9 @@ async function readStream(resp, contentEl, assistantMsg) {
         if (typeof deltaThinking === 'string' && deltaThinking) {
           assistantMsg.thinking += deltaThinking;
           assistantMsg.hasThinking = true;
-          thinkingDetailsOpen = true;
+          // Do not reopen thinking once normal content has started streaming.
+          if (!contentStarted && !streamFinished) thinkingDetailsOpen = true;
           requestRender();
-        }
-
-        // Handle inline <think> tags in streaming content
-        if (typeof deltaContent === 'string' && deltaContent && assistantMsg.content.includes('<think>')) {
-           const processed = processAssistantMessage(assistantMsg);
-           if (processed.thinking) {
-             assistantMsg.hasThinking = true;
-           }
         }
 
         if (json.usage) assistantMsg.tokens = json.usage;

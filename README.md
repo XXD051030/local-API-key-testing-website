@@ -57,12 +57,11 @@ This project provides a simple, local web interface and backend to test your API
 - Block Test Connection for unsaved (draft) keys with a clear toast guiding the user to save first.
 - UI: replace the center empty-state logo with "XXD" branding.
 
-### v1.4
-- Inline `<think>` tag parsing: automatically extract reasoning processes embedded directly in the `content` using `<think>...</think>` tags and move them to the collapsible "Thinking" panel.
-- Copy functionality fix: extracted thinking text is no longer duplicated as normal message content when copying responses.
-- Streaming compatibility: smoothly handle and identify inline `<think>` blocks during streaming output.
-
 ### v1.3.2.1
 - Add Key testing: draft keys now include an optional "Initial Model" so you can Test Connection immediately (without filling the chat model).
 - Saving draft keys: the optional "Initial Model" is written into that key's bound preset group (and optionally marked as Thinking).
 - Stability: `Test Connection` uses a 20-second timeout to avoid the page freezing.
+
+### v1.3.2.2
+- Thinking stream consistency: avoid reopening the "Thinking" panel after normal content has started streaming.
+- UI stability: prevent mixed/unstable thinking display in later replies of the same conversation.
