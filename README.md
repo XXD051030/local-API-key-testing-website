@@ -42,3 +42,8 @@ This project provides a simple, local web interface and backend to test your API
 - Stream stability: throttle UI re-render during streaming to avoid bursty/jerky updates.
 - Server streaming granularity: reduce proxy chunk size to improve SSE token pacing.
 - Model presets UX: when adding a new model in Settings -> Model Presets, prompt to mark it as a thinking-capable model (stored in `settings.thinkingModels`).
+
+### v1.3
+- Key-bound models: model selection is now bound to the active API key (chat dropdown only shows models for the selected key).
+- Thinking styling: make the "Thinking" area visually distinct with muted colors/borders.
+- UI hint: add a small label next to the `key-selector` so users know it controls the active API key.
