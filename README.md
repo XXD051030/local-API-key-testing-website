@@ -19,7 +19,9 @@ This project provides a simple, local web interface and backend to test your API
 
 ## Files Included
 
-* `index.html`: The main frontend interface.
+* `index.html`: Main page structure and script/style references.
+* `style.css`: Extracted frontend styles.
+* `js/`: Frontend JavaScript files split by responsibility (`state/storage/keys/conversations/render/api/events`).
 * `server.py`: The backend script for handling API key testing.
 
 ## Updates
@@ -65,3 +67,8 @@ This project provides a simple, local web interface and backend to test your API
 ### v1.3.2.2
 - Thinking stream consistency: avoid reopening the "Thinking" panel after normal content has started streaming.
 - UI stability: prevent mixed/unstable thinking display in later replies of the same conversation.
+
+### v2.0
+- Refactor architecture: split the original monolithic `index.html` into dedicated files (`style.css` + `js/*.js`) to improve maintainability.
+- Keep behavior unchanged: all existing chat, streaming, key management, presets, and local proxy features remain compatible.
+- Clarify script loading order in `index.html` so global dependencies initialize predictably.
