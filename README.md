@@ -7,7 +7,6 @@
 </p>
 
 <p align="center">
-  Forked from <a href="https://github.com/XXD051030/local-API-key-testing-website">XXD051030/local-API-key-testing-website</a>
 </p>
 
 <p align="center">English | <a href="./READMECN.md">Chinese</a></p>

@@ -7,7 +7,6 @@
 </p>
 
 <p align="center">
-  Fork 自 <a href="https://github.com/XXD051030/local-API-key-testing-website">XXD051030/local-API-key-testing-website</a>
 </p>
 
 <p align="center">中文 | <a href="./README.md">English</a></p>
