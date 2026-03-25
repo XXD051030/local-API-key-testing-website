@@ -10,12 +10,12 @@ This project provides a simple, local web interface and backend to test your API
 ## Usage
 
 1. Open a terminal in the project directory.
-2. Start the local server using Python's built-in HTTP server:
+2. Start the local server:
    ```bash
-   python3 -m http.server 8080
+   python3 server.py
    ```
-3. Open your web browser and navigate to `http://localhost:8080` (or the specific port you used).
-4. Run the backend server to handle API requests (if `server.py` requires separate execution, start it according to its specific instructions, typically `python3 server.py`).
+3. Open your web browser and navigate to `http://localhost:8080`.
+4. To access it from other devices on the same LAN, open `http://<your-local-ip>:8080` on those devices.
 
 ## Files Included
 
@@ -72,3 +72,9 @@ This project provides a simple, local web interface and backend to test your API
 - Refactor architecture: split the original monolithic `index.html` into dedicated files (`style.css` + `js/*.js`) to improve maintainability.
 - Keep behavior unchanged: all existing chat, streaming, key management, presets, and local proxy features remain compatible.
 - Clarify script loading order in `index.html` so global dependencies initialize predictably.
+
+### v2.1
+- LAN access support: when the app is opened through a local-network IP, it now correctly detects the bundled `server.py` backend instead of falling back to browser-only mode.
+- Shared persistence on LAN: IP-based access continues to use `/file` so `settings.json` and `conversations.json` stay stored on the host machine.
+- Proxy support on LAN: IP-based access also keeps using `/proxy`, so chat requests still avoid browser CORS issues.
+- UX: storage status now shows the active host so it is clearer which server instance the page is using.

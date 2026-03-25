@@ -38,9 +38,9 @@ function openSettings()  { $('#settings-drawer').classList.add('open');  $('#ove
 function closeSettings() { $('#settings-drawer').classList.remove('open'); $('#overlay').classList.remove('show'); }
 function updateStorageStatus() {
   const el = $('#storage-status');
-  if (isLocalhost()) {
+  if (useServerStorage) {
     el.className = 'status-badge ok';
-    el.innerHTML = '<span class="status-dot"></span> Server — saving to api/';
+    el.innerHTML = `<span class="status-dot"></span> Server — saving to api/ via ${escHtml(window.location.host)}`;
   } else {
     el.className = 'status-badge';
     el.innerHTML = '<span class="status-dot"></span> Browser storage (run python3 server.py for file persistence)';

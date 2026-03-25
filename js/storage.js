@@ -1,10 +1,20 @@
 // ── File storage via server (or localStorage fallback) ────────────────────────
-function isLocalhost() {
-  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+async function detectServerBackend() {
+  useServerStorage = false;
+  if (!/^https?:$/.test(window.location.protocol)) return false;
+
+  try {
+    const resp = await fetch('/file?name=__codex_probe__', { cache: 'no-store' });
+    const contentType = (resp.headers.get('Content-Type') || '').toLowerCase();
+    useServerStorage = resp.status === 403 && contentType.includes('application/json');
+  } catch(_) {
+    useServerStorage = false;
+  }
+  return useServerStorage;
 }
 
 async function readFile(filename) {
-  if (isLocalhost()) {
+  if (useServerStorage) {
     try {
       const resp = await fetch(`/file?name=${encodeURIComponent(filename)}`);
       if (resp.ok) return await resp.json();
@@ -18,14 +28,14 @@ async function readFile(filename) {
 }
 
 async function writeFile(filename, data) {
-  if (isLocalhost()) {
+  if (useServerStorage) {
     try {
-      await fetch(`/file?name=${encodeURIComponent(filename)}`, {
+      const resp = await fetch(`/file?name=${encodeURIComponent(filename)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      return true;
+      return resp.ok;
     } catch(_) { return false; }
   }
   try {
@@ -87,6 +97,7 @@ async function loadConversationsFromFile() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
+  await detectServerBackend();
   await loadSettingsFromFile();
   await loadConversationsFromFile();
   applySettingsToUI();
