@@ -88,3 +88,8 @@ This project provides a simple, local web interface and backend to test your API
 - Small-screen usability: reflow the top bar, model selector, input area, and settings sections to avoid clipped controls and cramped text on narrow screens.
 - Touch improvements: make message/conversation actions easier to access on touch devices instead of relying on hover-only behavior.
 - Mobile viewport polish: add safer dynamic viewport sizing and toast wrapping to reduce content cutoff on phone browsers while keeping the desktop layout unchanged.
+
+### v2.1.2
+- Thinking compatibility: detect assistant replies that embed reasoning inside `<think>...</think>` blocks and render that content in the separate "Thinking" panel instead of leaking it into normal output.
+- Streaming stability: keep thinking/output separation correct even when providers stream `<think>` tags through `delta.content` instead of dedicated reasoning fields.
+- History repair: normalize stored assistant messages on load so older conversations with embedded `<think>` content are automatically fixed and re-saved.

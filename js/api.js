@@ -86,7 +86,7 @@ async function callAPI(conv, contentEl, assistantMsg, activeKey) {
     const message = data.choices?.[0]?.message || {};
     assistantMsg.content = message.content || '';
     assistantMsg.thinking = message.reasoning_content || message.reasoning || message.thought || '';
-    assistantMsg.hasThinking = !!assistantMsg.thinking;
+    normalizeAssistantMessage(assistantMsg);
     if (data.usage) assistantMsg.tokens = data.usage;
     contentEl.innerHTML = renderAssistantContentHTML(assistantMsg, false);
   }
@@ -103,6 +103,16 @@ async function readStream(resp, contentEl, assistantMsg) {
   let thinkingDetailsOpen = true;
   let streamFinished = false;
   let contentStarted = !!assistantMsg.content;
+  let rawContent = assistantMsg.content || '';
+  let rawThinking = assistantMsg.thinking || '';
+
+  const syncAssistantMessage = () => {
+    const split = splitEmbeddedThinking(rawContent);
+    assistantMsg.content = split.content;
+    assistantMsg.thinking = mergeThinkingParts(rawThinking, split.thinking);
+    assistantMsg.hasThinking = !!assistantMsg.thinking;
+    if (assistantMsg.content) contentStarted = true;
+  };
 
   const renderNow = () => {
     lastRenderAt = Date.now();
@@ -131,6 +141,8 @@ async function readStream(resp, contentEl, assistantMsg) {
     }
     renderNow();
   };
+
+  syncAssistantMessage();
 
   // Initial render (thinking open while streaming)
   contentEl.innerHTML = renderAssistantContentHTML(assistantMsg, true);
@@ -162,18 +174,18 @@ async function readStream(resp, contentEl, assistantMsg) {
           delta.thought;
 
         if (typeof deltaContent === 'string' && deltaContent) {
-          assistantMsg.content += deltaContent;
-          contentStarted = true;
+          rawContent += deltaContent;
+          syncAssistantMessage();
           // If we already have thinking content, collapse it as soon as output starts.
-          if (assistantMsg.thinking && thinkingDetailsOpen) {
+          if (contentStarted && assistantMsg.thinking && thinkingDetailsOpen) {
             thinkingDetailsOpen = false;
           }
           requestRender();
         }
 
         if (typeof deltaThinking === 'string' && deltaThinking) {
-          assistantMsg.thinking += deltaThinking;
-          assistantMsg.hasThinking = true;
+          rawThinking += deltaThinking;
+          syncAssistantMessage();
           // Do not reopen thinking once normal content has started streaming.
           if (!contentStarted && !streamFinished) thinkingDetailsOpen = true;
           requestRender();
