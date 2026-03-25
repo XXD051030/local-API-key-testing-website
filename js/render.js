@@ -126,6 +126,7 @@ function renderMessages() {
 
 function buildMsgHTML(msg, idx) {
   const isUser  = msg.role === 'user';
+  if (!isUser) normalizeAssistantMessage(msg);
   const content = isUser
     ? `<div class="msg-content">${escHtml(msg.content).replace(/\n/g, '<br>')}</div>`
     : `<div class="msg-content">${renderAssistantContentHTML(msg, false)}</div>`;

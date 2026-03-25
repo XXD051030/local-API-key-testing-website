@@ -92,7 +92,10 @@ async function persistConversations() {
 
 async function loadConversationsFromFile() {
   const data = await readFile(CONV_FILE);
-  if (data && Array.isArray(data)) conversations = data;
+  if (data && Array.isArray(data)) {
+    conversations = data;
+    if (normalizeConversations(conversations)) await persistConversations();
+  }
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
