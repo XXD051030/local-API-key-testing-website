@@ -78,3 +78,9 @@ This project provides a simple, local web interface and backend to test your API
 - Shared persistence on LAN: IP-based access continues to use `/file` so `settings.json` and `conversations.json` stay stored on the host machine.
 - Proxy support on LAN: IP-based access also keeps using `/proxy`, so chat requests still avoid browser CORS issues.
 - UX: storage status now shows the active host so it is clearer which server instance the page is using.
+
+### v2.1.1
+- Mobile-responsive layout: convert the conversation sidebar into a small-screen drawer so the chat area can use the full viewport width on phones.
+- Small-screen usability: reflow the top bar, model selector, input area, and settings sections to avoid clipped controls and cramped text on narrow screens.
+- Touch improvements: make message/conversation actions easier to access on touch devices instead of relying on hover-only behavior.
+- Mobile viewport polish: add safer dynamic viewport sizing and toast wrapping to reduce content cutoff on phone browsers while keeping the desktop layout unchanged.
