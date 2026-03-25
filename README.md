@@ -10,12 +10,16 @@ This project provides a simple, local web interface and backend to test your API
 ## Usage
 
 1. Open a terminal in the project directory.
-2. Start the local server:
+2. Start the local server on the default port `8080`:
    ```bash
    python3 server.py
    ```
-3. Open your web browser and navigate to `http://localhost:8080`.
-4. To access it from other devices on the same LAN, open `http://<your-local-ip>:8080` on those devices.
+   Or start it on a custom port, for example `9000`:
+   ```bash
+   python3 server.py 9000
+   ```
+3. Open your web browser and navigate to `http://localhost:8080` by default, or `http://localhost:<your-port>` if you started the server on a custom port.
+4. To access it from other devices on the same LAN, open `http://<your-local-ip>:8080` by default, or `http://<your-local-ip>:<your-port>` if you are using a custom port.
 
 ## Files Included
 
