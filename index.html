@@ -1136,12 +1136,22 @@ const SETTINGS_FILE = 'settings.json';
 const CONV_FILE     = 'conversations.json';
 
 // ── File storage via server (or localStorage fallback) ────────────────────────
-function isLocalhost() {
-  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+async function detectServerBackend() {
+  useServerStorage = false;
+  if (!/^https?:$/.test(window.location.protocol)) return false;
+
+  try {
+    const resp = await fetch('/file?name=__codex_probe__', { cache: 'no-store' });
+    const contentType = (resp.headers.get('Content-Type') || '').toLowerCase();
+    useServerStorage = resp.status === 403 && contentType.includes('application/json');
+  } catch(_) {
+    useServerStorage = false;
+  }
+  return useServerStorage;
 }
 
 async function readFile(filename) {
-  if (isLocalhost()) {
+  if (useServerStorage) {
     try {
       const resp = await fetch(`/file?name=${encodeURIComponent(filename)}`);
       if (resp.ok) return await resp.json();
@@ -1155,14 +1165,14 @@ async function readFile(filename) {
 }
 
 async function writeFile(filename, data) {
-  if (isLocalhost()) {
+  if (useServerStorage) {
     try {
-      await fetch(`/file?name=${encodeURIComponent(filename)}`, {
+      const resp = await fetch(`/file?name=${encodeURIComponent(filename)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      return true;
+      return resp.ok;
     } catch(_) { return false; }
   }
   try {
@@ -1224,6 +1234,7 @@ async function loadConversationsFromFile() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
+  await detectServerBackend();
   await loadSettingsFromFile();
   await loadConversationsFromFile();
   applySettingsToUI();
@@ -1851,10 +1862,9 @@ function friendlyError(e) {
   return e.message;
 }
 
-// Routes API fetch through local proxy when on localhost (avoids CORS restrictions)
+// Routes API fetch through local proxy whenever the page is served by server.py
 async function proxyFetch(url, options) {
-  const onLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (onLocal) {
+  if (useServerStorage) {
     const proxyResp = await fetch(`${window.location.origin}/proxy`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1911,9 +1921,9 @@ function openSettings()  { $('#settings-drawer').classList.add('open');  $('#ove
 function closeSettings() { $('#settings-drawer').classList.remove('open'); $('#overlay').classList.remove('show'); }
 function updateStorageStatus() {
   const el = $('#storage-status');
-  if (isLocalhost()) {
+  if (useServerStorage) {
     el.className = 'status-badge ok';
-    el.innerHTML = '<span class="status-dot"></span> Server — saving to api/';
+    el.innerHTML = `<span class="status-dot"></span> Server — saving to api/ via ${escHtml(window.location.host)}`;
   } else {
     el.className = 'status-badge';
     el.innerHTML = '<span class="status-dot"></span> Browser storage (run python3 server.py for file persistence)';

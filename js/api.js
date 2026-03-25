@@ -250,10 +250,9 @@ function friendlyError(e) {
   return e.message;
 }
 
-// Routes API fetch through local proxy when on localhost (avoids CORS restrictions)
+// Routes API fetch through local proxy whenever the page is served by server.py
 async function proxyFetch(url, options) {
-  const onLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  if (onLocal) {
+  if (useServerStorage) {
     const proxyResp = await fetch(`${window.location.origin}/proxy`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
