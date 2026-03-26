@@ -47,12 +47,17 @@
 
 ## 文件说明
 
-* `index.html`: 主页面结构，以及脚本和样式的引用入口。
+* `index.html`: 主页面结构，以及外部资源的引用入口。
 * `style.css`: 独立拆分出的前端样式文件。
-* `js/`: 按职责拆分的前端 JavaScript 文件（`state/storage/keys/conversations/render/api/events`）。
+* `js/`: 按职责拆分的前端 JavaScript 文件（`state/keys/storage/conversations/render/api/marked/events`）。
 * `server.py`: 用于处理 API Key 测试的后端脚本。
 
 ## 更新记录
+
+### v2.2
+- 完成前端资源拆分：移除 `index.html` 中剩余的内嵌 CSS 和内嵌业务脚本，改为直接加载 `style.css` 与 `js/*.js`。
+- 运行逻辑对齐：以当前页面实际生效的脚本为准，重新整理外部 `js/` 文件，确保拆分后的源码与应用真实行为一致。
+- 结构清理：新增 `js/marked.js` 用于 markdown / 代码高亮初始化，让 `index.html` 专注于页面结构和依赖加载顺序。
 
 ### v2.1.3
 - 安全加固：在将 assistant 的 Markdown 渲染结果插入页面前，先进行 HTML 清理，移除危险标签、内联事件处理器，以及不安全的 `javascript:` / `data:text/html` 链接。

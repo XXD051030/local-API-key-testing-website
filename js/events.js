@@ -1,3 +1,35 @@
+// ── UI helpers ─────────────────────────────────────────────────────────────────
+function $(sel) { return document.querySelector(sel); }
+function friendlyError(e) {
+  if (e.name === 'TypeError' && e.message === 'Failed to fetch') {
+    const onLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (onLocal) {
+      return 'Failed to fetch — check your Base URL and network connection.\nIf using a VPN or firewall, try disabling it.';
+    }
+    return 'Failed to fetch — CORS blocked by browser.\n➜ Run: python3 server.py\n➜ Then open: http://localhost:8080';
+  }
+  return e.message;
+}
+
+// Routes API fetch through local proxy whenever the page is served by server.py
+async function proxyFetch(url, options) {
+  if (useServerStorage) {
+    const proxyResp = await fetch(`${window.location.origin}/proxy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        method: options.method || 'POST',
+        headers: options.headers || {},
+        bodyStr: options.body || '',
+      }),
+      signal: options.signal,
+    });
+    return proxyResp;
+  }
+  return fetch(url, options);
+}
+
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -34,7 +66,7 @@ function setSendStop(stop) {
   b.classList.toggle('stop', stop);
   b.disabled = !stop && !settings.model;
 }
-function openSettings()  { $('#settings-drawer').classList.add('open');  $('#overlay').classList.add('show'); }
+function openSettings()  { closeMobileSidebar(); $('#settings-drawer').classList.add('open');  $('#overlay').classList.add('show'); }
 function closeSettings() { $('#settings-drawer').classList.remove('open'); $('#overlay').classList.remove('show'); }
 function updateStorageStatus() {
   const el = $('#storage-status');
@@ -60,21 +92,55 @@ function autoResize(el) {
   el.style.height = 'auto';
   el.style.height = Math.min(el.scrollHeight, 200) + 'px';
 }
+const mobileSidebarQuery = window.matchMedia('(max-width: 760px)');
+function isMobileLayout() {
+  return mobileSidebarQuery.matches;
+}
+function openMobileSidebar() {
+  if (!isMobileLayout()) return;
+  document.body.classList.add('mobile-sidebar-open');
+}
+function closeMobileSidebar() {
+  document.body.classList.remove('mobile-sidebar-open');
+}
+function toggleMobileSidebar() {
+  if (!isMobileLayout()) return;
+  document.body.classList.toggle('mobile-sidebar-open');
+}
+function handleMobileLayoutChange(e) {
+  if (!e.matches) closeMobileSidebar();
+}
+if (mobileSidebarQuery.addEventListener) mobileSidebarQuery.addEventListener('change', handleMobileLayoutChange);
+else if (mobileSidebarQuery.addListener) mobileSidebarQuery.addListener(handleMobileLayoutChange);
 
 // ── Events ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   await init();
 
   // Sidebar
-  $('#btn-new').addEventListener('click', newConv);
+  $('#btn-new').addEventListener('click', () => {
+    closeMobileSidebar();
+    newConv();
+  });
+  $('#btn-sidebar-toggle').addEventListener('click', toggleMobileSidebar);
+  $('#sidebar-overlay').addEventListener('click', closeMobileSidebar);
   $('#conv-list').addEventListener('click', e => {
     const del  = e.target.closest('[data-del]');
     const item = e.target.closest('.conv-item');
     if (del)  { e.stopPropagation(); deleteConv(del.dataset.del); return; }
-    if (item) switchConv(item.dataset.id);
+    if (item) {
+      closeMobileSidebar();
+      switchConv(item.dataset.id);
+    }
   });
-  $('#btn-clear-all').addEventListener('click', clearAll);
-  $('#btn-export').addEventListener('click', exportConversations);
+  $('#btn-clear-all').addEventListener('click', () => {
+    closeMobileSidebar();
+    clearAll();
+  });
+  $('#btn-export').addEventListener('click', () => {
+    closeMobileSidebar();
+    exportConversations();
+  });
 
   // Topbar — key selector
   $('#key-selector').addEventListener('change', e => {
@@ -185,7 +251,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           persistSettings();
           renderKeyList();
           renderKeySelector();
-          refreshPresetsDropdowns();
         }
         renderPresetList();
         // Re-expand if was expanded

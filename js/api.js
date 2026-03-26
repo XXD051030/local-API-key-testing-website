@@ -9,8 +9,8 @@ async function sendMessage() {
   if (!settings.model) { toast('Select a model above the chat box'); return; }
 
   if (!activeConvId) newConv();
-
   const conv = activeConv();
+
   const userMsg = { role: 'user', content: text, time: Date.now() };
   conv.messages.push(userMsg);
   autoNameConv(conv);
@@ -247,36 +247,4 @@ function updateMsgMeta(contentEl, msg) {
     contentEl.after(metaEl);
   }
   metaEl.innerHTML = metaParts.join('');
-}
-
-// ── UI helpers ─────────────────────────────────────────────────────────────────
-function $(sel) { return document.querySelector(sel); }
-function friendlyError(e) {
-  if (e.name === 'TypeError' && e.message === 'Failed to fetch') {
-    const onLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (onLocal) {
-      return 'Failed to fetch — check your Base URL and network connection.\nIf using a VPN or firewall, try disabling it.';
-    }
-    return 'Failed to fetch — CORS blocked by browser.\n➜ Run: python3 server.py\n➜ Then open: http://localhost:8080';
-  }
-  return e.message;
-}
-
-// Routes API fetch through local proxy whenever the page is served by server.py
-async function proxyFetch(url, options) {
-  if (useServerStorage) {
-    const proxyResp = await fetch(`${window.location.origin}/proxy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url,
-        method: options.method || 'POST',
-        headers: options.headers || {},
-        bodyStr: options.body || '',
-      }),
-      signal: options.signal,
-    });
-    return proxyResp;
-  }
-  return fetch(url, options);
 }

@@ -1,42 +1,4 @@
 // ── Render ────────────────────────────────────────────────────────────────────
-function sanitizeRenderedHTML(html) {
-  const template = document.createElement('template');
-  template.innerHTML = String(html || '');
-
-  const blockedTags = new Set([
-    'script', 'iframe', 'object', 'embed', 'link', 'meta', 'base', 'form',
-  ]);
-
-  const walk = (root) => {
-    const nodes = Array.from(root.children);
-    for (const node of nodes) {
-      const tag = node.tagName.toLowerCase();
-      if (blockedTags.has(tag)) {
-        node.remove();
-        continue;
-      }
-
-      for (const attr of Array.from(node.attributes)) {
-        const name = attr.name.toLowerCase();
-        const value = attr.value.trim();
-        const isEventHandler = name.startsWith('on');
-        const isUnsafeSrcdoc = name === 'srcdoc';
-        const isUnsafeHref = (name === 'href' || name === 'src' || name === 'xlink:href')
-          && /^\s*(javascript:|data:text\/html)/i.test(value);
-
-        if (isEventHandler || isUnsafeSrcdoc || isUnsafeHref) {
-          node.removeAttribute(attr.name);
-        }
-      }
-
-      walk(node);
-    }
-  };
-
-  walk(template.content);
-  return template.innerHTML;
-}
-
 function renderKeySelector() {
   const sel = $('#key-selector');
   if (!settings.apiKeys.length) {
@@ -200,9 +162,9 @@ function renderAssistantContentHTML(msg, thinkingOpen) {
   const thinking = msg.thinking || '';
   const content = msg.content || '';
   const thinkingHtml = thinking
-    ? `<details class="thinking-details"${thinkingOpen ? ' open' : ''}><summary>Thinking</summary>${sanitizeRenderedHTML(marked.parse(thinking))}</details>`
+    ? `<details class="thinking-details"${thinkingOpen ? ' open' : ''}><summary>Thinking</summary>${marked.parse(thinking)}</details>`
     : '';
-  return `${thinkingHtml}${content ? sanitizeRenderedHTML(marked.parse(content)) : ''}`;
+  return `${thinkingHtml}${content ? marked.parse(content) : ''}`;
 }
 
 function appendMsgRow(msg, idx) {

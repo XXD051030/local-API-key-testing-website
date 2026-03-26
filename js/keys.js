@@ -1,4 +1,4 @@
-// ── Preset helpers ────────────────────────────────────────────────────────────
+// ── Key-bound Model presets ───────────────────────────────────────────────────
 function isKeyBoundPresetGroup(g) {
   return g
     && typeof g === 'object'

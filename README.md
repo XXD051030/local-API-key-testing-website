@@ -47,12 +47,17 @@
 
 ## Files Included
 
-* `index.html`: Main page structure and script/style references.
+* `index.html`: Main page structure and external asset references.
 * `style.css`: Extracted frontend styles.
-* `js/`: Frontend JavaScript files split by responsibility (`state/storage/keys/conversations/render/api/events`).
+* `js/`: Frontend JavaScript files split by responsibility (`state/keys/storage/conversations/render/api/marked/events`).
 * `server.py`: The backend script for handling API key testing.
 
 ## Updates
+
+### v2.2
+- Complete frontend asset split: remove the remaining inline CSS and inline app script from `index.html`, and load `style.css` plus `js/*.js` directly.
+- Runtime alignment: rebuild the external JS files from the currently active in-page logic so the loaded `js/` sources now match the behavior actually used by the app.
+- Structure cleanup: add `js/marked.js` for markdown / code highlighting setup and keep `index.html` focused on markup and dependency order.
 
 ### v2.1.3
 - Security hardening: sanitize rendered assistant markdown before inserting it into the page, removing dangerous tags, inline event handlers, and unsafe `javascript:` / `data:text/html` links.
