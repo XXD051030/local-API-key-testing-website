@@ -297,6 +297,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       persistSettings();
       renderKeyList();
       renderKeySelector();
+      refreshPresetsDropdowns();
     }
   });
 

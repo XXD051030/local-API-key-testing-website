@@ -54,6 +54,10 @@
 
 ## Updates
 
+### v2.1.3
+- Security hardening: sanitize rendered assistant markdown before inserting it into the page, removing dangerous tags, inline event handlers, and unsafe `javascript:` / `data:text/html` links.
+- Key/model sync fix: when switching the active API key from Settings, the model dropdown now refreshes immediately to show that key's bound presets.
+
 ### v2.1.2
 - Thinking compatibility: detect assistant replies that embed reasoning inside `<think>...</think>` blocks and render that content in the separate "Thinking" panel instead of leaking it into normal output.
 - Streaming stability: keep thinking/output separation correct even when providers stream `<think>` tags through `delta.content` instead of dedicated reasoning fields.

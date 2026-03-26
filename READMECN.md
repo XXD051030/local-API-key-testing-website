@@ -54,6 +54,10 @@
 
 ## 更新记录
 
+### v2.1.3
+- 安全加固：在将 assistant 的 Markdown 渲染结果插入页面前，先进行 HTML 清理，移除危险标签、内联事件处理器，以及不安全的 `javascript:` / `data:text/html` 链接。
+- Key / 模型同步修复：在 Settings 中切换当前激活的 API key 时，模型下拉框现在会立即刷新为该 key 绑定的预设模型。
+
 ### v2.1.2
 - Thinking 兼容性：识别嵌在 `<think>...</think>` 中的推理内容，并将其渲染到独立的 “Thinking” 面板，而不是混入普通输出。
 - 流式稳定性：即使某些提供商通过 `delta.content` 而不是专门的 reasoning 字段流式传出 `<think>` 标签，也能保持 Thinking 和正常输出的分离。
