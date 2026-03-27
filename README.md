@@ -54,6 +54,10 @@
 
 ## Updates
 
+### v2.2.1
+- Server logging: replace raw request lines for `/file` and `/proxy` with readable lines that include a time (`HH:MM:SS`), a short action label (`READ` / `SAVE` / `PROXY`), and a proxy target host (`→ example.com`) when the request is proxied.
+- Server logging: colorize HTTP status codes in the terminal when stdout is a TTY (2xx green, 3xx cyan, 4xx yellow, 5xx red).
+
 ### v2.2
 - Complete frontend asset split: remove the remaining inline CSS and inline app script from `index.html`, and load `style.css` plus `js/*.js` directly.
 - Runtime alignment: rebuild the external JS files from the currently active in-page logic so the loaded `js/` sources now match the behavior actually used by the app.

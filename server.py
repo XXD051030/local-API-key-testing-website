@@ -17,11 +17,26 @@ import urllib.error
 import json
 import os
 import sys
+import datetime
 from urllib.parse import urlparse, parse_qs
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ALLOWED_FILES = {'settings.json', 'conversations.json'}
+
+
+def _status_color(code_str):
+    try:
+        c = int(code_str)
+    except (TypeError, ValueError):
+        return 90
+    if 200 <= c < 300:
+        return 32
+    if 300 <= c < 400:
+        return 36
+    if 400 <= c < 500:
+        return 33
+    return 31
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -32,6 +47,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        self._log_proxy_target = None
         parsed = urlparse(self.path)
         if parsed.path == '/file':
             self._file_read(parse_qs(parsed.query).get('name', [''])[0])
@@ -39,6 +55,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             super().do_GET()
 
     def do_POST(self):
+        self._log_proxy_target = None
         parsed = urlparse(self.path)
         if parsed.path == '/proxy':
             self._proxy()
@@ -105,6 +122,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         try:
             length = int(self.headers.get('Content-Length', 0))
             data = json.loads(self.rfile.read(length))
+            target_url = data.get('url', '')
+            try:
+                netloc = urlparse(target_url).netloc
+                self._log_proxy_target = netloc or target_url or '?'
+            except Exception:
+                self._log_proxy_target = '?'
 
             req = urllib.request.Request(
                 data['url'],
@@ -122,7 +145,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self._cors()
                 self.end_headers()
                 while True:
-                    chunk = resp.read(1024)
+                    chunk = resp.read(512)
                     if not chunk:
                         break
                     self.wfile.write(chunk)
@@ -149,9 +172,32 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
     def log_message(self, fmt, *args):
-        path = args[0] if args else ''
-        if '/proxy' in path or '/file' in path:
-            print(f'  {args[1] if len(args) > 1 else ""}  {path}')
+        if not args:
+            return
+        requestline = args[0]
+        code_str = args[1] if len(args) > 1 else '-'
+        parts = requestline.split()
+        if len(parts) < 2:
+            return
+        method, req_path = parts[0], parts[1]
+        if '/proxy' not in req_path and '/file' not in req_path:
+            return
+        ts = datetime.datetime.now().strftime('%H:%M:%S')
+        if req_path.startswith('/proxy'):
+            label = 'PROXY'
+            detail = getattr(self, '_log_proxy_target', None) or '?'
+            detail = f'→ {detail}'
+        else:
+            parsed = urlparse(req_path)
+            name = parse_qs(parsed.query).get('name', [''])[0] or '?'
+            label = 'SAVE' if method == 'POST' else 'READ'
+            detail = name
+        use_color = sys.stdout.isatty()
+        if use_color:
+            code_out = f'\033[{_status_color(code_str)}m{code_str}\033[0m'
+        else:
+            code_out = code_str
+        print(f'  {ts}  {code_out}  {label:5}  {detail}')
 
 
 if __name__ == '__main__':
