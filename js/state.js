@@ -4,6 +4,7 @@ let settings = {
   apiKeys: [],        // [{id, name, baseUrl, key}]
   model: '',
   systemPrompt: '',
+  includeTimeContext: true,
   temperature: 0.7,
   maxTokens: '',
   stream: true,

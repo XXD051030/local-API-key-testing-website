@@ -201,7 +201,7 @@ async function callAPIWithOptionalSearch(conv, contentEl, assistantMsg, activeKe
 async function callAPIWithAgentSearch(conv, contentEl, assistantMsg, activeKey) {
   const currentDateTimeContext = buildCurrentDateTimeContext();
   const decisionMsgs = buildChatMessages(conv, {
-    extraSystemMessages: [currentDateTimeContext, buildSearchAgentInstructions()],
+    extraSystemMessages: [currentDateTimeContext, buildSearchAgentInstructions(!!currentDateTimeContext)],
   });
   const tools = buildSearchToolDefinitions();
   const searchRuns = [];

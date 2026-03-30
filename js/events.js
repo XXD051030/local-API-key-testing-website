@@ -68,6 +68,28 @@ function setSendStop(stop) {
 }
 function openSettings()  { closeMobileSidebar(); $('#settings-drawer').classList.add('open');  $('#overlay').classList.add('show'); }
 function closeSettings() { $('#settings-drawer').classList.remove('open'); $('#overlay').classList.remove('show'); }
+let settingsAutoSaveTimer = null;
+async function persistSettingsSafely(showSuccess = false) {
+  const ok = await persistSettings();
+  if (!ok) {
+    toast('Failed to save settings');
+    return false;
+  }
+  if (showSuccess) toast('Settings saved');
+  return true;
+}
+function autoSaveGeneralSettings(delay = 0) {
+  clearTimeout(settingsAutoSaveTimer);
+  const run = async () => {
+    readGeneralFromUI();
+    await persistSettingsSafely(false);
+  };
+  if (delay > 0) {
+    settingsAutoSaveTimer = setTimeout(run, delay);
+  } else {
+    run();
+  }
+}
 function updateStorageStatus() {
   const el = $('#storage-status');
   if (useServerStorage) {
@@ -181,16 +203,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#btn-settings').addEventListener('click', openSettings);
   $('#btn-close-settings').addEventListener('click', closeSettings);
   $('#overlay').addEventListener('click', closeSettings);
-
-  $('#btn-save-settings').addEventListener('click', () => {
-    readGeneralFromUI();
-    persistSettings();
-    toast('Settings saved');
-    closeSettings();
-  });
   $('#s-search-provider')?.addEventListener('change', () => {
     if (typeof updateSearchProviderFields === 'function') updateSearchProviderFields();
+    autoSaveGeneralSettings();
   });
+  $('#s-system-prompt')?.addEventListener('input', () => autoSaveGeneralSettings(400));
+  $('#s-include-time-context')?.addEventListener('change', () => autoSaveGeneralSettings());
+  $('#s-max-tokens')?.addEventListener('input', () => autoSaveGeneralSettings(300));
+  $('#s-stream')?.addEventListener('change', () => autoSaveGeneralSettings());
   $('#settings-drawer').addEventListener('click', e => {
     const toggleSecretBtn = e.target.closest('.toggle-secret-btn');
     if (!toggleSecretBtn) return;
@@ -200,7 +220,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleSecretBtn.textContent = target.type === 'password' ? 'Show' : 'Hide';
   });
 
-  $('#s-temperature').addEventListener('input', e => $('#temp-val').textContent = e.target.value);
+  $('#s-temperature').addEventListener('input', e => {
+    $('#temp-val').textContent = e.target.value;
+    autoSaveGeneralSettings(150);
+  });
+  $('#s-brave-api-key')?.addEventListener('input', () => autoSaveGeneralSettings(400));
+  $('#s-tavily-api-key')?.addEventListener('input', () => autoSaveGeneralSettings(400));
 
   // ── Preset management ─────────────────────────────────────────────────────
   $('#preset-list').addEventListener('click', e => {

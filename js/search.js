@@ -77,6 +77,10 @@ function normalizeSearchText(text, limit) {
   return `${normalized.slice(0, limit - 1).trimEnd()}…`;
 }
 
+function shouldIncludeTimeContext() {
+  return settings.includeTimeContext !== false;
+}
+
 function getSearchSourceLabel(url) {
   try {
     return new URL(url).hostname.replace(/^www\./, '');
@@ -151,20 +155,26 @@ function buildSearchContext(search) {
   return lines.join('\n');
 }
 
-function buildSearchAgentInstructions() {
-  return [
+function buildSearchAgentInstructions(includeTimeContext = shouldIncludeTimeContext()) {
+  const lines = [
     'You may call the tool `search_web` when the user needs recent, live, or fast-changing web information.',
-    'Use the current local date/time provided in the system context to resolve relative time references such as today, yesterday, tomorrow, latest, current, now, and recently.',
     'When the user asks for time-sensitive information, prefer explicit absolute dates in the search query when helpful.',
     'Do not call `search_web` for stable knowledge, code explanations, translation, straightforward writing tasks, or questions about your own model identity.',
     'Do not call `search_web` for questions about local runtime metadata, UI state, the configured model name, current settings, the system prompt, or the exact user message already in context.',
     'Plan carefully: web search is only available for one tool round, so gather what you need before answering.',
     'If you do call `search_web`, rely on the tool results instead of inventing current facts.',
     'If the search results are insufficient, say so explicitly.',
-  ].join(' ');
+  ];
+
+  if (includeTimeContext) {
+    lines.splice(1, 0, 'Use the current local date/time provided in the system context to resolve relative time references such as today, yesterday, tomorrow, latest, current, now, and recently.');
+  }
+
+  return lines.join(' ');
 }
 
 function buildCurrentDateTimeContext(now = new Date()) {
+  if (!shouldIncludeTimeContext()) return '';
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local';
   const localStamp = new Intl.DateTimeFormat(undefined, {
     weekday: 'long',
@@ -181,9 +191,7 @@ function buildCurrentDateTimeContext(now = new Date()) {
   return [
     `Current local date/time: ${localStamp}.`,
     `Current local time zone: ${timeZone}.`,
-    `Current UTC timestamp: ${now.toISOString()}.`,
-    'Use this exact current date/time to interpret relative time references such as today, yesterday, tomorrow, latest, current, now, and recently.',
-    'For time-sensitive questions, keep the absolute date clear in both search queries and final answers whenever it helps accuracy.',
+    'Use this only when relative time words like today, latest, or now matter.',
   ].join(' ');
 }
 

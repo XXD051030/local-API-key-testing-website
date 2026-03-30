@@ -119,6 +119,14 @@
           <textarea class="field-textarea" id="s-system-prompt" placeholder="You are a helpful assistant."></textarea>
         </div>
         <div class="field-group">
+          <label class="field-label">Current Time Context</label>
+          <select class="field-select" id="s-include-time-context">
+            <option value="true">Enabled</option>
+            <option value="false">Disabled</option>
+          </select>
+          <div class="field-desc">Adds the current local date/time and time zone to each request. Helpful for words like "today" or "latest", but uses extra tokens.</div>
+        </div>
+        <div class="field-group">
           <label class="field-label" style="display:flex;justify-content:space-between">
             Temperature <span id="temp-val" class="range-val">0.7</span>
           </label>
@@ -212,9 +220,6 @@
       </div>
     </div>
 
-  </div>
-  <div class="drawer-footer">
-    <button class="btn-primary" id="btn-save-settings" style="width:100%">Save Settings</button>
   </div>
 </div>
 

@@ -46,7 +46,7 @@ async function writeFile(filename, data) {
 
 // ── Settings persistence ──────────────────────────────────────────────────────
 async function persistSettings() {
-  await writeFile(SETTINGS_FILE, settings);
+  return await writeFile(SETTINGS_FILE, settings);
 }
 
 async function loadSettingsFromFile() {
@@ -70,6 +70,7 @@ async function loadSettingsFromFile() {
 
 function applySettingsToUI() {
   $('#s-system-prompt').value = settings.systemPrompt || '';
+  $('#s-include-time-context').value = (settings.includeTimeContext !== false).toString();
   $('#s-temperature').value   = settings.temperature ?? 0.7;
   $('#temp-val').textContent  = settings.temperature ?? 0.7;
   $('#s-max-tokens').value    = settings.maxTokens || '';
@@ -85,6 +86,7 @@ function applySettingsToUI() {
 
 function readGeneralFromUI() {
   settings.systemPrompt = $('#s-system-prompt').value;
+  settings.includeTimeContext = $('#s-include-time-context')?.value !== 'false';
   settings.temperature  = parseFloat($('#s-temperature').value);
   settings.maxTokens    = $('#s-max-tokens').value;
   settings.stream       = $('#s-stream').value === 'true';
@@ -94,7 +96,7 @@ function readGeneralFromUI() {
 
 // ── Conversations persistence ─────────────────────────────────────────────────
 async function persistConversations() {
-  await writeFile(CONV_FILE, conversations);
+  return await writeFile(CONV_FILE, conversations);
 }
 
 async function loadConversationsFromFile() {
