@@ -15,6 +15,41 @@ function applyModelInput() {
   // This function is kept for backward compatibility with older code paths.
 }
 
+function encodeDataValue(value) {
+  return encodeURIComponent(String(value ?? ''));
+}
+
+function decodeDataValue(value) {
+  try {
+    return decodeURIComponent(String(value ?? ''));
+  } catch (_) {
+    return String(value ?? '');
+  }
+}
+
+function sanitizeRenderedHTML(html) {
+  const source = String(html || '');
+  if (typeof DOMPurify?.sanitize === 'function') {
+    return DOMPurify.sanitize(source, {
+      USE_PROFILES: { html: true },
+      ALLOW_DATA_ATTR: true,
+    });
+  }
+  return escHtml(source);
+}
+
+function renderMarkdownSafely(markdown) {
+  const rendered = marked.parse(String(markdown || ''));
+  const sanitized = sanitizeRenderedHTML(rendered);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = sanitized;
+  tmp.querySelectorAll('a[href]').forEach(link => {
+    link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener noreferrer');
+  });
+  return tmp.innerHTML;
+}
+
 function getMessageSearchRuns(msg) {
   const runs = Array.isArray(msg?.searches)
     ? msg.searches.filter(run => run && typeof run === 'object' && run.query)
@@ -228,19 +263,15 @@ function renderMessages() {
 
 function buildMsgHTML(msg, idx) {
   const isUser  = msg.role === 'user';
+  const rowRole = isUser ? 'user' : 'assistant';
   if (!isUser) normalizeAssistantMessage(msg);
   const content = isUser
     ? `<div class="msg-content">${escHtml(msg.content).replace(/\n/g, '<br>')}</div>`
     : `<div class="msg-content">${renderAssistantContentHTML(msg, false)}</div>`;
   const tokenInfo = isUser ? '' : buildAssistantMetaHTML(msg);
   const searchSources = isUser ? '' : buildSearchSourcesHTML(msg);
-  // Copy button uses backtick template literals: escape `${` to prevent injection
-  const escapedContent = msg.content
-    .replace(/\\/g, '\\\\')
-    .replace(/`/g, '\\`')
-    .replace(/\$\{/g, '\\${');
   return `
-    <div class="msg-row ${msg.role}">
+    <div class="msg-row ${rowRole}" data-msg-idx="${idx}">
       <div class="msg-avatar">${isUser ? 'U' : 'AI'}</div>
       <div class="msg-body">
         <div class="msg-meta">
@@ -251,8 +282,8 @@ function buildMsgHTML(msg, idx) {
         ${tokenInfo}
         ${searchSources}
         <div class="msg-actions">
-          <button class="action-btn" onclick="copyText(this,\`${escapedContent}\`)">Copy</button>
-          ${!isUser ? `<button class="action-btn" onclick="regenFrom(${idx})">Regenerate</button>` : ''}
+          <button class="action-btn msg-copy-btn" type="button" data-msg-idx="${idx}">Copy</button>
+          ${!isUser ? `<button class="action-btn msg-regen-btn" type="button" data-msg-idx="${idx}">Regenerate</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -266,9 +297,9 @@ function renderAssistantContentHTML(msg, thinkingOpen) {
     ? buildAssistantPendingHTML(msg.pendingState)
     : '';
   const thinkingHtml = thinking
-    ? `<details class="thinking-details"${thinkingOpen ? ' open' : ''}><summary>Thinking</summary>${marked.parse(thinking)}</details>`
+    ? `<details class="thinking-details"${thinkingOpen ? ' open' : ''}><summary>Thinking</summary>${renderMarkdownSafely(thinking)}</details>`
     : '';
-  return `${pendingHtml}${thinkingHtml}${content ? marked.parse(content) : ''}`;
+  return `${pendingHtml}${thinkingHtml}${content ? renderMarkdownSafely(content) : ''}`;
 }
 
 function appendMsgRow(msg, idx) {

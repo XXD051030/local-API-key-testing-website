@@ -18,18 +18,15 @@ mdRenderer.code = (...args) => {
       ? hljs.highlight(code, { language: lang }).value
       : hljs.highlightAuto(code).value;
   } catch (_) { highlighted = escHtml(code); }
-  const langLabel = lang || 'text';
-  // Copy button uses backtick template literals: escape `${` to prevent injection
-  const escapedForAttr = code
-    .replace(/\\/g, '\\\\')
-    .replace(/`/g, '\\`')
-    .replace(/\$\{/g, '\\${');
+  const langLabel = String(lang || 'text');
+  const safeLangClass = langLabel.replace(/[^\w-]/g, '') || 'text';
+  const encodedCode = escHtml(encodeDataValue(code));
   return `<div class="code-block">
     <div class="code-header">
-      <span>${langLabel}</span>
-      <button class="copy-btn" onclick="copyText(this,\`${escapedForAttr}\`)">Copy</button>
+      <span>${escHtml(langLabel)}</span>
+      <button class="copy-btn code-copy-btn" type="button" data-copy-code="${encodedCode}">Copy</button>
     </div>
-    <pre><code class="hljs language-${langLabel}">${highlighted}</code></pre>
+    <pre><code class="hljs language-${safeLangClass}">${highlighted}</code></pre>
   </div>`;
 };
 marked.use({ renderer: mdRenderer, breaks: true, gfm: true });

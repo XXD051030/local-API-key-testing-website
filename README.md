@@ -73,6 +73,7 @@ Notes:
 
 ## Current Version
 
-### v2.3.4
-- Search provider API key inputs now update the in-memory search settings immediately, so live web search works even if you send a message right after pasting a key.
-- If the model requests a search provider that does not have a configured API key, the app now falls back to the configured available provider instead of falsely reporting that no search key is set.
+### v2.3.5
+- Assistant Markdown output is now sanitized before it is inserted into the page, reducing the risk of malicious HTML from model responses.
+- Message actions and code block copy buttons no longer use inline `onclick` handlers, and now rely on safer `data-*` attributes with event delegation.
+- Code block language labels and copy payload handling are now hardened to avoid injection through rendered code metadata.

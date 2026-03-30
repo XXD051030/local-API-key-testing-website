@@ -167,6 +167,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     closeMobileSidebar();
     exportConversations();
   });
+  $('#messages').addEventListener('click', e => {
+    const copyBtn = e.target.closest('.msg-copy-btn');
+    if (copyBtn) {
+      const idx = parseInt(copyBtn.dataset.msgIdx, 10);
+      const msg = activeConv()?.messages?.[idx];
+      copyText(copyBtn, String(msg?.content || ''));
+      return;
+    }
+
+    const regenBtn = e.target.closest('.msg-regen-btn');
+    if (regenBtn) {
+      const idx = parseInt(regenBtn.dataset.msgIdx, 10);
+      if (Number.isFinite(idx)) regenFrom(idx);
+      return;
+    }
+
+    const codeCopyBtn = e.target.closest('.code-copy-btn');
+    if (codeCopyBtn) {
+      copyText(codeCopyBtn, decodeDataValue(codeCopyBtn.dataset.copyCode));
+    }
+  });
 
   // Topbar — key selector
   $('#key-selector').addEventListener('change', e => {
