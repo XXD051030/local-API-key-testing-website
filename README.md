@@ -73,9 +73,6 @@ Notes:
 
 ## Current Version
 
-### v2.3.3
-- Switching `API Key` now automatically applies that key's default model, so you can chat immediately without reselecting a model.
-- The last model you manually choose for a key is now remembered as that key's default model.
-- Model presets are now stored in a clearer key-linked format with `keyName` and `defaultModel` in `settings.json`.
-- Removing a model from `Model Presets` now asks for confirmation.
-- Deleting a single conversation now asks for confirmation to reduce accidental clicks.
+### v2.3.4
+- Search provider API key inputs now update the in-memory search settings immediately, so live web search works even if you send a message right after pasting a key.
+- If the model requests a search provider that does not have a configured API key, the app now falls back to the configured available provider instead of falsely reporting that no search key is set.

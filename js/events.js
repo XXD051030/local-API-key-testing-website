@@ -90,6 +90,9 @@ function autoSaveGeneralSettings(delay = 0) {
     run();
   }
 }
+function syncSearchSettingsInMemory() {
+  if (typeof readSearchSettingsFromUI === 'function') readSearchSettingsFromUI();
+}
 function updateStorageStatus() {
   const el = $('#storage-status');
   if (useServerStorage) {
@@ -230,8 +233,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('#temp-val').textContent = e.target.value;
     autoSaveGeneralSettings(150);
   });
-  $('#s-brave-api-key')?.addEventListener('input', () => autoSaveGeneralSettings(400));
-  $('#s-tavily-api-key')?.addEventListener('input', () => autoSaveGeneralSettings(400));
+  $('#s-brave-api-key')?.addEventListener('input', () => {
+    syncSearchSettingsInMemory();
+    autoSaveGeneralSettings(400);
+  });
+  $('#s-tavily-api-key')?.addEventListener('input', () => {
+    syncSearchSettingsInMemory();
+    autoSaveGeneralSettings(400);
+  });
 
   // ── Preset management ─────────────────────────────────────────────────────
   $('#preset-list').addEventListener('click', e => {

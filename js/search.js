@@ -64,6 +64,22 @@ function hasSearchCredentials(search = getSearchSettings()) {
   return !!search.braveApiKey;
 }
 
+function resolveSearchProvider(search = getSearchSettings(), preferredProvider) {
+  const current = normalizeSearchSettings(search);
+  const preferred = String(preferredProvider || '').toLowerCase();
+  const hasTavily = !!current.tavilyApiKey;
+  const hasBrave = !!current.braveApiKey;
+
+  if (preferred === 'tavily' && hasTavily) return 'tavily';
+  if (preferred === 'brave' && hasBrave) return 'brave';
+  if (current.provider === 'tavily' && hasTavily) return 'tavily';
+  if (current.provider === 'brave' && hasBrave) return 'brave';
+  if (hasBrave) return 'brave';
+  if (hasTavily) return 'tavily';
+  if (preferred === 'tavily' || preferred === 'brave') return preferred;
+  return current.provider || 'brave';
+}
+
 function updateSearchProviderFields() {
   const provider = $('#s-search-provider')?.value || getSearchSettings().provider;
   document.querySelectorAll('.search-provider-credentials-group').forEach(group => {
@@ -239,7 +255,8 @@ async function searchWebQuery(query, options = {}, signal) {
   if (!useServerStorage) {
     throw new Error('Web Search requires the local server. Run python3 server.py and open http://localhost:8080.');
   }
-  const provider = String(options.provider || search.provider || 'brave').toLowerCase();
+  const preferredProvider = String(options.provider || search.provider || 'brave').toLowerCase();
+  const provider = resolveSearchProvider(search, preferredProvider);
   const topic = options.topic || deriveSearchTopic(normalizedQuery);
   const maxResults = options.maxResults ?? search.maxResults;
   const effective = normalizeSearchSettings({
