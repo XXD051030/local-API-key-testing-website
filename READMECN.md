@@ -45,89 +45,34 @@
 4. 打开浏览器并访问 `http://localhost:8080`，如果使用了自定义端口，则访问 `http://localhost:<your-port>`。
 5. 如果需要让同一局域网中的其他设备访问，可打开 `http://<your-local-ip>:8080`，或访问 `http://<your-local-ip>:<your-port>`。
 
+## 联网搜索
+
+现在可以在把问题发送给当前聊天模型之前，先做一次网页搜索，再把最新结果作为上下文提供给模型。
+
+1. 先运行本地后端：`python3 server.py` 或 `py server.py`。
+2. 通过该后端地址打开页面，例如 `http://localhost:8080`。
+3. 进入 `Settings -> Web Search`，在 `Brave` 和 `Tavily` 中选择一个当前 provider。
+4. 展开 `Provider API Key`，填写当前 provider 对应的 API Key。
+5. 在模型选择器右侧打开 `Web Search` 开关，即可为当前聊天请求启用联网搜索。
+6. 开启后，由模型自己决定是否调用 `search_web`；如果实际发生联网搜索，助手回复下方会显示一个紧凑折叠的 `Sources`。
+
+说明：
+
+* 联网搜索依赖本地后端，纯浏览器存储模式下不可用。
+* 联网搜索现在默认由模型自己决定是否搜索，因此当前模型/提供商需要支持 OpenAI-compatible 的工具调用。
+* 搜索 provider 一次只能选一个：`Brave` 或 `Tavily`。
+* 当模型还在判断是否需要联网搜索、且首个流式 token 还没到达时，助手消息现在会立刻显示 `Thinking...`，不再先留一段空白。
+
 ## 文件说明
 
 * `index.html`: 主页面结构，以及外部资源的引用入口。
 * `style.css`: 独立拆分出的前端样式文件。
 * `js/`: 按职责拆分的前端 JavaScript 文件（`state/keys/storage/conversations/render/api/marked/events`）。
+* `js/search.js`: 联网搜索设置、provider 选择、查询构造与结果标准化逻辑。
 * `server.py`: 用于处理 API Key 测试的后端脚本。
 
-## 更新记录
+## 当前版本
 
-### v2.2.1
-- 服务端日志：`/file` 与 `/proxy` 不再打印原始 HTTP 请求行，改为带时间（`HH:MM:SS`）、简短动作标签（`READ` / `SAVE` / `PROXY`），以及代理目标主机（`→ example.com`）更易读的一行日志。
-- 服务端日志：在终端为 TTY 时按 HTTP 状态码着色（2xx 绿、3xx 青、4xx 黄、5xx 红）。
-
-### v2.2
-- 完成前端资源拆分：移除 `index.html` 中剩余的内嵌 CSS 和内嵌业务脚本，改为直接加载 `style.css` 与 `js/*.js`。
-- 运行逻辑对齐：以当前页面实际生效的脚本为准，重新整理外部 `js/` 文件，确保拆分后的源码与应用真实行为一致。
-- 结构清理：新增 `js/marked.js` 用于 markdown / 代码高亮初始化，让 `index.html` 专注于页面结构和依赖加载顺序。
-
-### v2.1.3
-- 安全加固：在将 assistant 的 Markdown 渲染结果插入页面前，先进行 HTML 清理，移除危险标签、内联事件处理器，以及不安全的 `javascript:` / `data:text/html` 链接。
-- Key / 模型同步修复：在 Settings 中切换当前激活的 API key 时，模型下拉框现在会立即刷新为该 key 绑定的预设模型。
-
-### v2.1.2
-- Thinking 兼容性：识别嵌在 `<think>...</think>` 中的推理内容，并将其渲染到独立的 “Thinking” 面板，而不是混入普通输出。
-- 流式稳定性：即使某些提供商通过 `delta.content` 而不是专门的 reasoning 字段流式传出 `<think>` 标签，也能保持 Thinking 和正常输出的分离。
-- 历史修复：加载旧会话时会规范化历史 assistant 消息，自动修复并重新保存嵌入 `<think>` 内容的旧数据。
-
-### v2.1.1
-- 移动端响应式布局：将会话侧边栏改为小屏抽屉式结构，让手机上聊天区域可以使用完整视口宽度。
-- 小屏可用性优化：重新排布顶部栏、模型选择器、输入区和设置区域，避免窄屏下控件被裁切或文字过于拥挤。
-- 触控体验优化：让消息和会话操作在触摸设备上更容易使用，不再依赖纯悬停交互。
-- 移动端视口细节优化：改进动态视口尺寸和 toast 换行，减少手机浏览器中的内容被遮挡问题，同时保持桌面端布局不变。
-
-### v2.1
-- 支持局域网访问：当应用通过局域网 IP 打开时，现在可以正确识别内置的 `server.py` 后端，而不再错误回退到纯浏览器模式。
-- 局域网共享持久化：通过 IP 访问时仍然使用 `/file`，因此 `settings.json` 和 `conversations.json` 会继续保存在宿主机器上。
-- 局域网代理支持：通过 IP 访问时同样继续使用 `/proxy`，从而避免聊天请求受到浏览器 CORS 限制。
-- 体验优化：存储状态现在会显示当前主机，方便判断页面正在使用哪个服务实例。
-
-### v2.0
-- 架构重构：将原本单体的 `index.html` 拆分为独立文件（`style.css` + `js/*.js`），提升可维护性。
-- 保持行为不变：现有聊天、流式输出、密钥管理、预设和本地代理功能继续保持兼容。
-- 明确 `index.html` 中的脚本加载顺序，让全局依赖初始化更稳定、可预测。
-
-### v1.3.2.2
-- Thinking 流一致性：避免在普通内容已经开始输出后再次打开 “Thinking” 面板。
-- 界面稳定性：避免同一会话后续回复中出现混杂或不稳定的 Thinking 显示。
-
-### v1.3.2.1
-- Add Key 测试增强：草稿状态的 key 现在支持可选的 “Initial Model”，因此无需先填写聊天模型也能立即执行 Test Connection。
-- 草稿 key 保存逻辑：可选的 “Initial Model” 会写入该 key 绑定的预设组中，并可选择标记为 Thinking 模型。
-- 稳定性：`Test Connection` 现在使用 20 秒超时，避免页面长时间卡住。
-
-### v1.3.2
-- Test Connection 现在会自动使用被测试 key 绑定的第一个模型，不再依赖聊天区域的模型选择器。
-- 对未保存的草稿 key 禁用 Test Connection，并通过明确的 toast 提示用户先保存。
-- 界面更新：将中间空状态 logo 替换为 “XXD” 品牌标识。
-
-### v1.3.1
-- Thinking 折叠修复：流式输出结束后，“Thinking” 区域现在会立即、稳定地自动折叠。
-- 更温和的 Thinking 标记方式：在设置中新增模型时，改为使用内联复选框，而不是阻塞式的 `confirm()` 弹窗。
-
-### v1.3
-- 模型与 key 绑定：模型选择现在会绑定到当前激活的 API key，聊天下拉框只显示该 key 可用的模型。
-- Thinking 样式优化：让 “Thinking” 区域使用更柔和的颜色和边框，视觉上更易区分。
-- 界面提示：在 `key-selector` 旁增加小标签，帮助用户理解它控制的是当前激活的 API key。
-
-### v1.2
-- Thinking 显示：当 `stream` 增量中包含 `reasoning_content/reasoning/thought` 时，显示一个流式更新的 `<details>` “Thinking” 区域，并在结束后自动折叠。
-- 流式稳定性：对流式过程中的界面重渲染进行节流，避免输出过于突兀或卡顿。
-- 服务端流粒度优化：减小代理分块大小，提升 SSE token 输出节奏。
-- 模型预设体验优化：在 Settings -> Model Presets 中添加新模型时，会提示是否将其标记为支持 Thinking 的模型，存储于 `settings.thinkingModels`。
-
-### v1.1
-- 仅支持预设模型选择：移除顶部栏的自由输入模型框；模型必须通过 Settings -> Model Presets 进行选择。
-- 界面调整：将模型选择器移动到聊天输入框上方。
-- 移除每个 API key 的 `Default Model` 逻辑：API key 不再携带默认模型，模型选择改为全局行为。
-- 体验优化：只有在选择了有效模型后才启用 `Send` 按钮，并改进空状态提示。
-
-### v1.0.1 23
-- 加固前端渲染：让 `marked` 的代码块渲染兼容不同版本。
-- 安全加固：在生成 `Copy` 按钮模板字符串时转义 `${`，降低注入风险。
-- 体验与稳定性：为消息输入框增加 `maxlength`，避免超大请求和渲染开销。
-- 提升本地服务健壮性：为被禁止的 `/file` 读写请求增加 CORS 头和 JSON 错误响应体。
-- 提升本地服务健壮性：对格式错误的 `/file` 请求返回 `400 Invalid JSON`。
-- 稳定性：为上游代理请求增加 `timeout=30`，避免请求挂起。
+### v2.3.1
+- 开启 `Web Search` 后，新 assistant 回复会立刻显示 `Thinking...`，不再在首个响应状态出现前留下空白停顿。
+- 在“由模型决定”模式下，界面现在只会在模型实际发起联网搜索时，才从 `Thinking...` 切换到 `Searching the web...`。

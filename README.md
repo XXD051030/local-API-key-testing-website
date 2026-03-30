@@ -45,89 +45,34 @@
 4. Open your browser and visit `http://localhost:8080`, or `http://localhost:<your-port>` if you used a custom port.
 5. To access it from other devices on the same LAN, open `http://<your-local-ip>:8080` or `http://<your-local-ip>:<your-port>`.
 
+## Live Web Search
+
+The app can now search the web before sending your prompt to the selected chat model.
+
+1. Start the local backend with `python3 server.py` or `py server.py`.
+2. Open the app through that backend URL, such as `http://localhost:8080`.
+3. In `Settings -> Web Search`, choose either `Brave` or `Tavily`.
+4. Expand `Provider API Key`, then save the API key for the currently selected provider.
+5. Use the `Web Search` switch next to the model selector to turn live search on or off per chat request.
+6. When enabled, the model decides whether to call `search_web`, and the assistant reply will include a compact `Sources` block when search was used.
+
+Notes:
+
+* Live web search requires the local backend; it is not available in browser-only mode.
+* Live web search now defaults to `Model decides`, so your current chat model needs OpenAI-compatible tool calling support.
+* Only one search provider is active at a time: `Brave` or `Tavily`.
+* While the model is deciding whether to search and before the first streamed tokens arrive, the assistant row now shows `Thinking...` immediately instead of staying blank.
+
 ## Files Included
 
 * `index.html`: Main page structure and external asset references.
 * `style.css`: Extracted frontend styles.
 * `js/`: Frontend JavaScript files split by responsibility (`state/keys/storage/conversations/render/api/marked/events`).
+* `js/search.js`: Web search settings, provider selection, query preparation, and result normalization.
 * `server.py`: The backend script for handling API key testing.
 
-## Updates
+## Current Version
 
-### v2.2.1
-- Server logging: replace raw request lines for `/file` and `/proxy` with readable lines that include a time (`HH:MM:SS`), a short action label (`READ` / `SAVE` / `PROXY`), and a proxy target host (`→ example.com`) when the request is proxied.
-- Server logging: colorize HTTP status codes in the terminal when stdout is a TTY (2xx green, 3xx cyan, 4xx yellow, 5xx red).
-
-### v2.2
-- Complete frontend asset split: remove the remaining inline CSS and inline app script from `index.html`, and load `style.css` plus `js/*.js` directly.
-- Runtime alignment: rebuild the external JS files from the currently active in-page logic so the loaded `js/` sources now match the behavior actually used by the app.
-- Structure cleanup: add `js/marked.js` for markdown / code highlighting setup and keep `index.html` focused on markup and dependency order.
-
-### v2.1.3
-- Security hardening: sanitize rendered assistant markdown before inserting it into the page, removing dangerous tags, inline event handlers, and unsafe `javascript:` / `data:text/html` links.
-- Key/model sync fix: when switching the active API key from Settings, the model dropdown now refreshes immediately to show that key's bound presets.
-
-### v2.1.2
-- Thinking compatibility: detect assistant replies that embed reasoning inside `<think>...</think>` blocks and render that content in the separate "Thinking" panel instead of leaking it into normal output.
-- Streaming stability: keep thinking/output separation correct even when providers stream `<think>` tags through `delta.content` instead of dedicated reasoning fields.
-- History repair: normalize stored assistant messages on load so older conversations with embedded `<think>` content are automatically fixed and re-saved.
-
-### v2.1.1
-- Mobile-responsive layout: convert the conversation sidebar into a small-screen drawer so the chat area can use the full viewport width on phones.
-- Small-screen usability: reflow the top bar, model selector, input area, and settings sections to avoid clipped controls and cramped text on narrow screens.
-- Touch improvements: make message and conversation actions easier to access on touch devices instead of relying on hover-only behavior.
-- Mobile viewport polish: add safer dynamic viewport sizing and toast wrapping to reduce content cutoff on phone browsers while keeping the desktop layout unchanged.
-
-### v2.1
-- LAN access support: when the app is opened through a local-network IP, it now correctly detects the bundled `server.py` backend instead of falling back to browser-only mode.
-- Shared persistence on LAN: IP-based access continues to use `/file` so `settings.json` and `conversations.json` stay stored on the host machine.
-- Proxy support on LAN: IP-based access also keeps using `/proxy`, so chat requests still avoid browser CORS issues.
-- UX: storage status now shows the active host so it is clearer which server instance the page is using.
-
-### v2.0
-- Refactor architecture: split the original monolithic `index.html` into dedicated files (`style.css` + `js/*.js`) to improve maintainability.
-- Keep behavior unchanged: all existing chat, streaming, key management, presets, and local proxy features remain compatible.
-- Clarify script loading order in `index.html` so global dependencies initialize predictably.
-
-### v1.3.2.2
-- Thinking stream consistency: avoid reopening the "Thinking" panel after normal content has started streaming.
-- UI stability: prevent mixed or unstable thinking display in later replies of the same conversation.
-
-### v1.3.2.1
-- Add Key testing: draft keys now include an optional "Initial Model" so you can Test Connection immediately, without filling the chat model first.
-- Saving draft keys: the optional "Initial Model" is written into that key's bound preset group and can optionally be marked as Thinking.
-- Stability: `Test Connection` uses a 20-second timeout to avoid page freezing.
-
-### v1.3.2
-- Test Connection now auto-uses the first model bound to the tested key and no longer depends on the chat model selector.
-- Block Test Connection for unsaved draft keys with a clear toast guiding the user to save first.
-- UI: replace the center empty-state logo with "XXD" branding.
-
-### v1.3.1
-- Thinking collapse fix: when streaming ends, the "Thinking" section now reliably collapses immediately.
-- Gentle thinking mark: adding a model in Settings now uses an inline checkbox instead of a blocking `confirm()` popup.
-
-### v1.3
-- Key-bound models: model selection is now bound to the active API key, and the chat dropdown only shows models for the selected key.
-- Thinking styling: make the "Thinking" area visually distinct with muted colors and borders.
-- UI hint: add a small label next to the `key-selector` so users know it controls the active API key.
-
-### v1.2
-- Thinking display: when `stream` delta includes `reasoning_content/reasoning/thought`, show a streaming `<details>` "Thinking" section and collapse it when done.
-- Stream stability: throttle UI re-render during streaming to avoid bursty or jerky updates.
-- Server streaming granularity: reduce proxy chunk size to improve SSE token pacing.
-- Model presets UX: when adding a new model in Settings -> Model Presets, prompt to mark it as a thinking-capable model stored in `settings.thinkingModels`.
-
-### v1.1
-- Presets-only model selection: remove the topbar free-text model input; models must be selected from Settings -> Model Presets.
-- UI update: move the model selector to sit above the chat input box.
-- Remove per-API-key `Default Model` logic: API keys no longer carry a default model; model selection is global.
-- UX: disable the `Send` button until a valid model is selected and improve empty-state guidance.
-
-### v1.0.1 23
-- Harden frontend rendering: make `marked` code-block rendering compatible across marked versions.
-- Security hardening: escape `${` when generating `Copy` button template strings to reduce injection risk.
-- UX and stability: add `maxlength` to the message input to avoid huge requests and rendering overhead.
-- Improve local server robustness: add CORS headers and a JSON error body for forbidden `/file` reads and writes.
-- Improve local server robustness: return `400 Invalid JSON` for malformed `/file` payloads.
-- Stability: add `timeout=30` to the upstream proxy request to prevent hanging.
+### v2.3.1
+- `Web Search` enabled chats now show `Thinking...` immediately when a new assistant reply starts, instead of leaving a blank gap before the first response state appears.
+- In `Model decides` mode, the UI now transitions cleanly from `Thinking...` to `Searching the web...` only when the model actually requests live search.
