@@ -170,13 +170,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     settings.activeKeyId = e.target.value || null;
     renderKeyList();
     renderKeySelector();
-    refreshPresetsDropdowns();
+    syncActiveKeyModelSelection({ forceDefault: true });
     persistSettings();
   });
 
   // Model selector (presets-only)
   $('#model-selector').addEventListener('change', e => {
     settings.model = e.target.value;
+    const activePreset = typeof getPresetByKeyId === 'function'
+      ? getPresetByKeyId(settings.activeKeyId)
+      : null;
+    if (activePreset && settings.model && activePreset.models.includes(settings.model)) {
+      activePreset.defaultModel = settings.model;
+    }
     syncSendButton();
     persistSettings();
   });
@@ -231,13 +237,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#preset-list').addEventListener('click', e => {
     const delGroup  = e.target.closest('.preset-del-group');
     const delModel  = e.target.closest('.preset-del-model');
+    const defaultBtn = e.target.closest('.preset-default-btn');
     const addModel  = e.target.closest('.preset-add-model-btn');
     const label     = e.target.closest('.preset-group-label');
     const header    = e.target.closest('.preset-group-header');
 
     if (delGroup) {
       const gi = parseInt(delGroup.dataset.gi);
-      if (!confirm(`Delete group "${getPresets()[gi].label}"?`)) return;
+      if (!confirm(`Delete group "${getPresetDisplayName(getPresets()[gi])}"?`)) return;
       ensureCustomPresets();
       const groupModels = settings.presets[gi]?.models || [];
       settings.presets.splice(gi, 1);
@@ -250,11 +257,30 @@ document.addEventListener('DOMContentLoaded', async () => {
       const gi = parseInt(delModel.dataset.gi), mi = parseInt(delModel.dataset.mi);
       ensureCustomPresets();
       const deletedModel = settings.presets[gi]?.models?.[mi];
+      if (!deletedModel) return;
+      if (!confirm(`Remove model "${deletedModel}" from this key?`)) return;
       settings.presets[gi].models.splice(mi, 1);
+      if (settings.presets[gi] && settings.presets[gi].defaultModel === deletedModel) {
+        settings.presets[gi].defaultModel = settings.presets[gi].models[0] || '';
+      }
       if (!Array.isArray(settings.thinkingModels)) settings.thinkingModels = [];
       if (deletedModel) settings.thinkingModels = settings.thinkingModels.filter(m => m !== deletedModel);
-      persistSettings(); renderPresetList(); refreshPresetsDropdowns();
+      renderPresetList(); refreshPresetsDropdowns(); persistSettings();
       // Re-expand group
+      const g = document.querySelector(`.preset-group[data-gi="${gi}"] .preset-group-body`);
+      if (g) { g.style.display = ''; g.closest('.preset-group').querySelector('.preset-toggle').textContent = '▼'; }
+      return;
+    }
+    if (defaultBtn) {
+      const gi = parseInt(defaultBtn.dataset.gi);
+      const mi = parseInt(defaultBtn.dataset.mi);
+      const model = settings.presets[gi]?.models?.[mi];
+      if (!model) return;
+      settings.presets[gi].defaultModel = model;
+      if (settings.presets[gi]?.keyId === settings.activeKeyId) {
+        settings.model = model;
+      }
+      renderPresetList(); refreshPresetsDropdowns({ forceDefault: settings.presets[gi]?.keyId === settings.activeKeyId }); persistSettings();
       const g = document.querySelector(`.preset-group[data-gi="${gi}"] .preset-group-body`);
       if (g) { g.style.display = ''; g.closest('.preset-group').querySelector('.preset-toggle').textContent = '▼'; }
       return;
@@ -268,12 +294,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       const isNew = !settings.presets[gi].models.includes(model);
       if (isNew) {
         settings.presets[gi].models.push(model);
+        if (!settings.presets[gi].defaultModel) settings.presets[gi].defaultModel = model;
         if (!Array.isArray(settings.thinkingModels)) settings.thinkingModels = [];
         const row = addModel.closest('.preset-add-row');
         const thinkingFlag = row?.querySelector('.preset-thinking-flag')?.checked;
         if (thinkingFlag && !settings.thinkingModels.includes(model)) settings.thinkingModels.push(model);
       }
-      persistSettings(); renderPresetList(); refreshPresetsDropdowns();
+      renderPresetList(); refreshPresetsDropdowns(); persistSettings();
       // Re-expand group
       const g = document.querySelector(`.preset-group[data-gi="${gi}"] .preset-group-body`);
       if (g) { g.style.display = ''; g.closest('.preset-group').querySelector('.preset-toggle').textContent = '▼'; }
@@ -286,7 +313,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const keyId = group?.keyId;
       const input = document.createElement('input');
       input.className = 'preset-group-label-input';
-      input.value = group?.label || '';
+      input.value = getPresetDisplayName(group);
       label.replaceWith(input);
       input.focus(); input.select();
       const save = () => {
@@ -298,6 +325,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           persistSettings();
           renderKeyList();
           renderKeySelector();
+          refreshPresetsDropdowns();
         }
         renderPresetList();
         // Re-expand if was expanded
@@ -339,16 +367,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('#btn-add-preset-group').style.display = '';
   };
   const confirmAddGroup = () => {
-    const label = $('#preset-new-group').value.trim();
-    if (label) {
-      ensureCustomPresets();
-      settings.presets.push({ label, models: [] });
-      persistSettings(); renderPresetList(); refreshPresetsDropdowns();
-      // Expand new group
-      const groups = document.querySelectorAll('.preset-group');
-      const last = groups[groups.length - 1];
-      if (last) { last.querySelector('.preset-group-body').style.display = ''; last.querySelector('.preset-toggle').textContent = '▼'; }
-    }
+    toast('Preset groups are created automatically from API Keys');
     hideAddGroup();
   };
 
@@ -406,10 +425,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else if (keyItem && !e.target.closest('.key-item-btns')) {
       // Click on key item to make it active
       settings.activeKeyId = keyItem.dataset.id;
-      persistSettings();
       renderKeyList();
       renderKeySelector();
-      refreshPresetsDropdowns();
+      syncActiveKeyModelSelection({ forceDefault: true });
+      persistSettings();
     }
   });
 

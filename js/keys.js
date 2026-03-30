@@ -3,12 +3,53 @@ function isKeyBoundPresetGroup(g) {
   return g
     && typeof g === 'object'
     && typeof g.keyId === 'string'
-    && typeof g.label === 'string'
     && Array.isArray(g.models);
 }
 
 function getPresets() {
   return Array.isArray(settings.presets) ? settings.presets : [];
+}
+
+function getPresetByKeyId(keyId) {
+  return getPresets().find(group => group?.keyId === keyId) || null;
+}
+
+function getPresetDisplayName(group) {
+  if (!group) return '';
+  const key = settings.apiKeys.find(item => item.id === group.keyId);
+  return String(key?.name || group.keyName || group.label || '').trim();
+}
+
+function getPresetDefaultModel(group) {
+  if (!group || !Array.isArray(group.models) || !group.models.length) return '';
+  const defaultModel = String(group.defaultModel || '').trim();
+  return group.models.includes(defaultModel) ? defaultModel : group.models[0];
+}
+
+function ensureActiveKeySelection() {
+  const hasActiveKey = settings.apiKeys.some(key => key.id === settings.activeKeyId);
+  if (hasActiveKey) return settings.activeKeyId;
+  settings.activeKeyId = settings.apiKeys[0]?.id || null;
+  return settings.activeKeyId;
+}
+
+function normalizePresetGroup(group, key) {
+  const models = Array.from(new Set(
+    (Array.isArray(group?.models) ? group.models : [])
+      .map(model => String(model || '').trim())
+      .filter(Boolean)
+  ));
+  const keyName = String(key?.name || group?.keyName || group?.label || '').trim();
+  const defaultModel = models.includes(String(group?.defaultModel || '').trim())
+    ? String(group.defaultModel).trim()
+    : (models[0] || '');
+
+  return {
+    keyId: String(key?.id || group?.keyId || ''),
+    keyName,
+    models,
+    defaultModel,
+  };
 }
 
 // Kept for backward compatibility with existing preset-management code paths.
@@ -19,44 +60,55 @@ function ensureCustomPresets() {
   settings.presets = settings.presets.filter(isKeyBoundPresetGroup);
 
   // Ensure every API key has exactly one preset group.
-  for (const k of settings.apiKeys) {
-    let group = settings.presets.find(p => p.keyId === k.id);
-    if (!group) {
-      group = { label: k.name, keyId: k.id, models: [] };
-      settings.presets.push(group);
-    } else {
-      group.label = k.name;
-      if (!Array.isArray(group.models)) group.models = [];
-    }
-  }
+  settings.presets = settings.apiKeys.map(key => {
+    const existing = getPresetByKeyId(key.id);
+    return normalizePresetGroup(existing, key);
+  });
 }
 
 function buildPresetsHTML(groups) {
   const list = Array.isArray(groups) ? groups : getPresets();
   return list
     .map(g =>
-      `<optgroup label="${escHtml(g.label)}">${g.models.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('')}</optgroup>`
+      `<optgroup label="${escHtml(getPresetDisplayName(g))}">${g.models.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('')}</optgroup>`
     )
     .join('');
 }
 
-function refreshPresetsDropdowns() {
+function refreshPresetsDropdowns(options = {}) {
   const sel = $('#model-selector');
   if (!sel) return;
 
-  const current = settings.model || '';
+  ensureCustomPresets();
+  ensureActiveKeySelection();
 
-  const activeGroups = getPresets().filter(g => g.keyId === settings.activeKeyId);
+  const current = settings.model || '';
+  const activeGroup = getPresetByKeyId(settings.activeKeyId);
+  const activeGroups = activeGroup ? [activeGroup] : [];
   sel.innerHTML = `<option value="">Select a model...</option>${buildPresetsHTML(activeGroups)}`;
 
-  const valid = current && activeGroups.some(g => g.models.includes(current));
-  if (valid) sel.value = current;
-  else {
+  if (!activeGroup || !activeGroup.models.length) {
     settings.model = '';
     sel.value = '';
+    syncSendButton();
+    return '';
   }
 
+  const valid = current && activeGroup.models.includes(current);
+  const nextModel = options.forceDefault
+    ? getPresetDefaultModel(activeGroup)
+    : (valid ? current : getPresetDefaultModel(activeGroup));
+
+  settings.model = nextModel || '';
+  sel.value = nextModel || '';
   syncSendButton();
+  return settings.model;
+}
+
+function syncActiveKeyModelSelection(options = {}) {
+  ensureCustomPresets();
+  ensureActiveKeySelection();
+  return refreshPresetsDropdowns(options);
 }
 
 function renderPresetList() {
@@ -66,7 +118,7 @@ function renderPresetList() {
     <div class="preset-group" data-gi="${gi}">
       <div class="preset-group-header">
         <button class="preset-toggle" title="Expand / Collapse">▶</button>
-        <span class="preset-group-label" data-gi="${gi}" title="Click to rename">${escHtml(g.label)}</span>
+        <span class="preset-group-label" data-gi="${gi}" title="Click to rename">${escHtml(getPresetDisplayName(g))}</span>
         <span class="preset-model-count">${g.models.length}</span>
       </div>
       <div class="preset-group-body" style="display:none">
@@ -79,6 +131,9 @@ function renderPresetList() {
                 ? '<span style="color:var(--accent);font-size:11px;margin-left:6px;white-space:nowrap">Thinking</span>'
                 : ''}
             </span>
+            <button class="preset-default-btn ${getPresetDefaultModel(g) === m ? 'active' : ''}" data-gi="${gi}" data-mi="${mi}" title="${getPresetDefaultModel(g) === m ? 'Default model' : 'Set as default model'}">
+              ${getPresetDefaultModel(g) === m ? 'Default' : 'Set Default'}
+            </button>
             <button class="key-act-btn del preset-del-model" data-gi="${gi}" data-mi="${mi}" title="Remove">✕</button>
           </div>`).join('')}
         <div class="preset-add-row">
@@ -110,11 +165,11 @@ function deleteKey(id) {
   }
 
   // If current model belongs to removed key, we will clear it after refresh.
-  persistSettings();
   renderKeyList();
   renderKeySelector();
-  refreshPresetsDropdowns();
+  syncActiveKeyModelSelection({ forceDefault: true });
   renderPresetList();
+  persistSettings();
 }
 
 function saveKeyFromForm(form) {
@@ -143,6 +198,7 @@ function saveKeyFromForm(form) {
       if (group && !group.models.includes(initialModel)) {
         group.models.push(initialModel);
       }
+      if (group && !group.defaultModel) group.defaultModel = initialModel;
       const thinkingFlag = form.querySelector('.kf-thinking-flag');
       if (thinkingFlag?.checked) {
         if (!Array.isArray(settings.thinkingModels)) settings.thinkingModels = [];
@@ -156,11 +212,11 @@ function saveKeyFromForm(form) {
   }
 
   editingKeyId = null;
-  persistSettings();
   renderKeyList();
   renderKeySelector();
-  refreshPresetsDropdowns();
+  syncActiveKeyModelSelection();
   renderPresetList();
+  persistSettings();
   toast('Key saved');
 }
 
@@ -179,8 +235,7 @@ async function testKeyFromForm(form) {
     if (!modelToUse) { toast('Enter a model name above to test this connection'); return; }
   } else {
     const group = Array.isArray(settings.presets) ? settings.presets.find(p => p.keyId === editId) || null : null;
-    const models = group?.models || [];
-    modelToUse = models.find(m => m === chatModel) || models[0] || '';
+    modelToUse = (group?.models || []).find(m => m === chatModel) || getPresetDefaultModel(group) || '';
   }
 
   if (!modelToUse) {

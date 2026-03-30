@@ -73,6 +73,9 @@ Notes:
 
 ## Current Version
 
-### v2.3.1
-- `Web Search` enabled chats now show `Thinking...` immediately when a new assistant reply starts, instead of leaving a blank gap before the first response state appears.
-- In `Model decides` mode, the UI now transitions cleanly from `Thinking...` to `Searching the web...` only when the model actually requests live search.
+### v2.3.3
+- Switching `API Key` now automatically applies that key's default model, so you can chat immediately without reselecting a model.
+- The last model you manually choose for a key is now remembered as that key's default model.
+- Model presets are now stored in a clearer key-linked format with `keyName` and `defaultModel` in `settings.json`.
+- Removing a model from `Model Presets` now asks for confirmation.
+- Deleting a single conversation now asks for confirmation to reduce accidental clicks.

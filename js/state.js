@@ -8,7 +8,7 @@ let settings = {
   temperature: 0.7,
   maxTokens: '',
   stream: true,
-  presets: [],        // Key-bound model groups: [{label, keyId, models: string[]}]
+  presets: [],        // Key-bound model groups: [{keyId, keyName, models: string[], defaultModel}]
   thinkingModels: [],
   search: {
     enabled: false,

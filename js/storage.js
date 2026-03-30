@@ -51,7 +51,9 @@ async function persistSettings() {
 
 async function loadSettingsFromFile() {
   const data = await readFile(SETTINGS_FILE);
+  let shouldPersist = false;
   if (data && typeof data === 'object') {
+    const rawPresets = JSON.stringify(Array.isArray(data.presets) ? data.presets : []);
     settings = {
       ...settings,
       ...data,
@@ -64,8 +66,10 @@ async function loadSettingsFromFile() {
 
     // Discard old presets without keyId and ensure groups exist for keys.
     ensureCustomPresets();
+    shouldPersist = rawPresets !== JSON.stringify(settings.presets);
   }
   settings.search = normalizeSearchSettings(settings.search);
+  if (shouldPersist) await persistSettings();
 }
 
 function applySettingsToUI() {
@@ -76,9 +80,10 @@ function applySettingsToUI() {
   $('#s-max-tokens').value    = settings.maxTokens || '';
   $('#s-stream').value        = (settings.stream !== false).toString();
 
-  refreshPresetsDropdowns();
-
+  ensureCustomPresets();
+  ensureActiveKeySelection();
   renderKeySelector();
+  refreshPresetsDropdowns();
   renderKeyList();
   renderPresetList();
   if (typeof applySearchSettingsToUI === 'function') applySearchSettingsToUI();
@@ -112,7 +117,12 @@ async function init() {
   await detectServerBackend();
   await loadSettingsFromFile();
   await loadConversationsFromFile();
+  const previousActiveKeyId = settings.activeKeyId;
+  const previousModel = settings.model;
   applySettingsToUI();
+  if (settings.activeKeyId !== previousActiveKeyId || settings.model !== previousModel) {
+    await persistSettings();
+  }
   renderConvList();
   if (conversations.length > 0) switchConv(conversations[0].id);
   updateStorageStatus();

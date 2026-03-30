@@ -1068,6 +1068,27 @@ body {
   color: var(--text2);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
+.preset-default-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text3);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  line-height: 1.4;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.preset-default-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.preset-default-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(108,99,255,.1);
+}
 .preset-add-row {
   display: flex;
   gap: 6px;

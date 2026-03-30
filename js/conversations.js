@@ -23,6 +23,9 @@ function switchConv(id) {
 }
 
 function deleteConv(id) {
+  const conv = conversations.find(c => c.id === id) || null;
+  const label = conv?.name ? ` "${conv.name}"` : '';
+  if (!confirm(`Delete conversation${label}? This cannot be undone.`)) return;
   conversations = conversations.filter(c => c.id !== id);
   if (activeConvId === id) activeConvId = conversations[0]?.id || null;
   persistConversations();
