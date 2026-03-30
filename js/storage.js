@@ -52,7 +52,11 @@ async function persistSettings() {
 async function loadSettingsFromFile() {
   const data = await readFile(SETTINGS_FILE);
   if (data && typeof data === 'object') {
-    settings = { ...settings, ...data };
+    settings = {
+      ...settings,
+      ...data,
+      search: normalizeSearchSettings(data.search),
+    };
     // Ensure apiKeys is array
     if (!Array.isArray(settings.apiKeys)) settings.apiKeys = [];
     if (!Array.isArray(settings.thinkingModels)) settings.thinkingModels = [];
@@ -61,6 +65,7 @@ async function loadSettingsFromFile() {
     // Discard old presets without keyId and ensure groups exist for keys.
     ensureCustomPresets();
   }
+  settings.search = normalizeSearchSettings(settings.search);
 }
 
 function applySettingsToUI() {
@@ -75,6 +80,7 @@ function applySettingsToUI() {
   renderKeySelector();
   renderKeyList();
   renderPresetList();
+  if (typeof applySearchSettingsToUI === 'function') applySearchSettingsToUI();
 }
 
 function readGeneralFromUI() {
@@ -83,6 +89,7 @@ function readGeneralFromUI() {
   settings.maxTokens    = $('#s-max-tokens').value;
   settings.stream       = $('#s-stream').value === 'true';
   settings.model        = $('#model-selector').value;
+  if (typeof readSearchSettingsFromUI === 'function') readSearchSettingsFromUI();
 }
 
 // ── Conversations persistence ─────────────────────────────────────────────────

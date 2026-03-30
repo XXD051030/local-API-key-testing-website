@@ -15,6 +15,108 @@ function applyModelInput() {
   // This function is kept for backward compatibility with older code paths.
 }
 
+function getMessageSearchRuns(msg) {
+  const runs = Array.isArray(msg?.searches)
+    ? msg.searches.filter(run => run && typeof run === 'object' && run.query)
+    : [];
+  if (runs.length) return runs;
+  return msg?.search?.query ? [msg.search] : [];
+}
+
+function buildAssistantMetaHTML(msg) {
+  const metaParts = [];
+  const searchRuns = getMessageSearchRuns(msg);
+  if (searchRuns.length) {
+    const searchLabel = searchRuns.length === 1
+      ? `Web Search · ${formatSearchProviderLabel(searchRuns[0].provider)}`
+      : `Web Search · ${searchRuns.length} queries`;
+    metaParts.push(`<span class="msg-badge search">${escHtml(searchLabel)}</span>`);
+  }
+  if (msg.model) {
+    metaParts.push(`<span class="msg-badge model">${escHtml(msg.model)}</span>`);
+  }
+  if (msg.tokens) {
+    metaParts.push(`↑${msg.tokens.prompt_tokens||0} ↓${msg.tokens.completion_tokens||0} · total ${msg.tokens.total_tokens||0}`);
+  }
+  return metaParts.length
+    ? `<div class="token-info" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${metaParts.join('')}</div>`
+    : '';
+}
+
+function buildSearchRunCardsHTML(search) {
+  const results = Array.isArray(search.results) ? search.results : [];
+  if (!results.length) {
+    return '<div class="search-sources-empty">No live results were returned for this query.</div>';
+  }
+
+  return `<div class="search-source-list">${results.map((result, index) => `
+    <a class="search-source-card" href="${escHtml(result.url)}" target="_blank" rel="noopener noreferrer">
+      <span class="search-source-index">${index + 1}</span>
+      <span class="search-source-main">
+        <span class="search-source-title">${escHtml(result.title || result.url)}</span>
+        <span class="search-source-url">${escHtml(result.source || result.url)}</span>
+        ${result.snippet ? `<span class="search-source-snippet">${escHtml(result.snippet)}</span>` : ''}
+      </span>
+    </a>`).join('')}</div>`;
+}
+
+function buildSearchRunHeaderHTML(search) {
+  const shortQuery = search.query.length > 96 ? `${search.query.slice(0, 95)}…` : search.query;
+  return `
+    <div class="search-sources-header search-run-header">
+      <span class="search-sources-title">Sources</span>
+      <span class="search-sources-provider">${escHtml(formatSearchProviderLabel(search.provider))}</span>
+      <span class="search-sources-query">${escHtml(shortQuery)}</span>
+    </div>`;
+}
+
+function buildSearchSourcesHTML(msg) {
+  const searchRuns = getMessageSearchRuns(msg);
+  if (!searchRuns.length) return '';
+  const totalResults = searchRuns.reduce((sum, search) => sum + (Array.isArray(search.results) ? search.results.length : 0), 0);
+  const summaryText = searchRuns.length === 1
+    ? `Sources · ${formatSearchProviderLabel(searchRuns[0].provider)} · ${totalResults} results`
+    : `Sources · ${searchRuns.length} searches · ${totalResults} results`;
+
+  if (searchRuns.length === 1) {
+    const search = searchRuns[0];
+    return `
+      <details class="search-sources">
+        <summary class="search-sources-summary">${escHtml(summaryText)}</summary>
+        <div class="search-sources-panel">
+          ${buildSearchRunHeaderHTML(search)}
+          ${buildSearchRunCardsHTML(search)}
+        </div>
+      </details>`;
+  }
+
+  return `
+    <details class="search-sources">
+      <summary class="search-sources-summary">${escHtml(summaryText)}</summary>
+      <div class="search-sources-panel">
+        ${searchRuns.map(search => `
+          <div class="search-source-group">
+            ${buildSearchRunHeaderHTML(search)}
+            ${buildSearchRunCardsHTML(search)}
+          </div>`).join('')}
+      </div>
+    </details>`;
+}
+
+function buildAssistantPendingHTML(state) {
+  const labels = {
+    searching: 'Searching the web...',
+    thinking: 'Thinking...',
+  };
+  const label = labels[state];
+  if (!label) return '';
+  return `
+    <div class="assistant-status" data-state="${escHtml(state)}">
+      <span class="assistant-status-spinner" aria-hidden="true"></span>
+      <span class="assistant-status-text">${escHtml(label)}</span>
+    </div>`;
+}
+
 function renderKeyList() {
   const container = $('#key-list');
   let html = '';
@@ -130,10 +232,8 @@ function buildMsgHTML(msg, idx) {
   const content = isUser
     ? `<div class="msg-content">${escHtml(msg.content).replace(/\n/g, '<br>')}</div>`
     : `<div class="msg-content">${renderAssistantContentHTML(msg, false)}</div>`;
-  const metaParts = [];
-  if (msg.model) metaParts.push(`<span style="color:var(--accent);background:rgba(108,99,255,.1);padding:1px 7px;border-radius:10px">${escHtml(msg.model)}</span>`);
-  if (msg.tokens) metaParts.push(`↑${msg.tokens.prompt_tokens||0} ↓${msg.tokens.completion_tokens||0} · total ${msg.tokens.total_tokens||0}`);
-  const tokenInfo = metaParts.length ? `<div class="token-info" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${metaParts.join('')}</div>` : '';
+  const tokenInfo = isUser ? '' : buildAssistantMetaHTML(msg);
+  const searchSources = isUser ? '' : buildSearchSourcesHTML(msg);
   // Copy button uses backtick template literals: escape `${` to prevent injection
   const escapedContent = msg.content
     .replace(/\\/g, '\\\\')
@@ -149,6 +249,7 @@ function buildMsgHTML(msg, idx) {
         </div>
         ${content}
         ${tokenInfo}
+        ${searchSources}
         <div class="msg-actions">
           <button class="action-btn" onclick="copyText(this,\`${escapedContent}\`)">Copy</button>
           ${!isUser ? `<button class="action-btn" onclick="regenFrom(${idx})">Regenerate</button>` : ''}
@@ -161,10 +262,13 @@ function buildMsgHTML(msg, idx) {
 function renderAssistantContentHTML(msg, thinkingOpen) {
   const thinking = msg.thinking || '';
   const content = msg.content || '';
+  const pendingHtml = !thinking && !content && msg.pendingState
+    ? buildAssistantPendingHTML(msg.pendingState)
+    : '';
   const thinkingHtml = thinking
     ? `<details class="thinking-details"${thinkingOpen ? ' open' : ''}><summary>Thinking</summary>${marked.parse(thinking)}</details>`
     : '';
-  return `${thinkingHtml}${content ? marked.parse(content) : ''}`;
+  return `${pendingHtml}${thinkingHtml}${content ? marked.parse(content) : ''}`;
 }
 
 function appendMsgRow(msg, idx) {

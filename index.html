@@ -72,6 +72,11 @@
       <select id="model-selector" title="Select model">
         <option value="">Select a model...</option>
       </select>
+      <label class="search-toggle" title="Search the web before sending the prompt">
+        <input id="search-toggle" type="checkbox">
+        <span class="search-toggle-switch" aria-hidden="true"></span>
+        <span class="search-toggle-text">Web Search</span>
+      </label>
     </div>
     <div id="input-wrap">
       <textarea id="user-input" rows="1" maxlength="20000" placeholder="Type a message..."></textarea>
@@ -139,6 +144,45 @@
 
     <hr class="section-divider">
 
+    <!-- Web Search -->
+    <div>
+      <div class="section-label" style="margin-bottom:14px">Web Search</div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="field-group">
+          <label class="field-label">Search Provider</label>
+          <select class="field-select" id="s-search-provider">
+            <option value="brave">Brave</option>
+            <option value="tavily">Tavily</option>
+          </select>
+          <div class="field-desc">When Web Search is enabled, the model decides whether this provider needs to be used for the current reply.</div>
+        </div>
+        <details class="search-settings-details" id="search-provider-credentials">
+          <summary class="search-settings-summary">Provider API Key</summary>
+          <div class="search-settings-panel">
+            <div class="field-group search-provider-credentials-group" data-provider="brave">
+              <label class="field-label">Brave Search API Key</label>
+              <div class="row-group">
+                <input class="field-input" id="s-brave-api-key" type="password" placeholder="BSA..." autocomplete="off">
+                <button class="btn-secondary toggle-secret-btn" data-target="s-brave-api-key" type="button" style="flex-shrink:0">Show</button>
+              </div>
+            </div>
+            <div class="field-group search-provider-credentials-group" data-provider="tavily">
+              <label class="field-label">Tavily API Key</label>
+              <div class="row-group">
+                <input class="field-input" id="s-tavily-api-key" type="password" placeholder="tvly-..." autocomplete="off">
+                <button class="btn-secondary toggle-secret-btn" data-target="s-tavily-api-key" type="button" style="flex-shrink:0">Show</button>
+              </div>
+            </div>
+          </div>
+        </details>
+        <div class="field-desc">
+          Live web search uses the local backend, so run <code>python3 server.py</code> and open the app through <code>http://localhost:8080</code>.
+        </div>
+      </div>
+    </div>
+
+    <hr class="section-divider">
+
     <!-- Model Presets -->
     <div>
       <div class="section-header">
@@ -182,6 +226,7 @@
 <script src="js/storage.js"></script>
 <script src="js/conversations.js"></script>
 <script src="js/render.js"></script>
+<script src="js/search.js"></script>
 <script src="js/api.js"></script>
 <script src="js/marked.js"></script>
 <script src="js/events.js"></script>

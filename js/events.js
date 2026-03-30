@@ -116,6 +116,7 @@ else if (mobileSidebarQuery.addListener) mobileSidebarQuery.addListener(handleMo
 // ── Events ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   await init();
+  if (typeof queueSearchToggleHeightSync === 'function') queueSearchToggleHeightSync();
 
   // Sidebar
   $('#btn-new').addEventListener('click', () => {
@@ -157,6 +158,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     syncSendButton();
     persistSettings();
   });
+  $('#search-toggle').addEventListener('change', e => {
+    settings.search = normalizeSearchSettings({
+      ...getSearchSettings(),
+      enabled: e.target.checked,
+    });
+    persistSettings();
+    if (e.target.checked && !useServerStorage) {
+      toast('Web Search requires python3 server.py and http://localhost:8080');
+    }
+  });
 
   // Topbar — regen
   $('#btn-regen').addEventListener('click', () => {
@@ -176,6 +187,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     persistSettings();
     toast('Settings saved');
     closeSettings();
+  });
+  $('#s-search-provider')?.addEventListener('change', () => {
+    if (typeof updateSearchProviderFields === 'function') updateSearchProviderFields();
+  });
+  $('#settings-drawer').addEventListener('click', e => {
+    const toggleSecretBtn = e.target.closest('.toggle-secret-btn');
+    if (!toggleSecretBtn) return;
+    const target = document.getElementById(toggleSecretBtn.dataset.target || '');
+    if (!target) return;
+    target.type = target.type === 'password' ? 'text' : 'password';
+    toggleSecretBtn.textContent = target.type === 'password' ? 'Show' : 'Hide';
   });
 
   $('#s-temperature').addEventListener('input', e => $('#temp-val').textContent = e.target.value);
@@ -381,3 +403,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     else sendMessage();
   });
 });
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', () => {
+    if (typeof queueSearchToggleHeightSync === 'function') queueSearchToggleHeightSync();
+  });
+}

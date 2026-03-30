@@ -9,6 +9,13 @@ let settings = {
   stream: true,
   presets: [],        // Key-bound model groups: [{label, keyId, models: string[]}]
   thinkingModels: [],
+  search: {
+    enabled: false,
+    provider: 'brave',
+    tavilyApiKey: '',
+    braveApiKey: '',
+    maxResults: 5,
+  },
 };
 let conversations = [];
 let activeConvId = null;
@@ -21,6 +28,39 @@ const CONV_FILE     = 'conversations.json';
 
 const THINK_OPEN_TAG  = '<think>';
 const THINK_CLOSE_TAG = '</think>';
+const SEARCH_PROVIDERS = ['brave', 'tavily'];
+const DEFAULT_SEARCH_SETTINGS = Object.freeze({
+  enabled: false,
+  provider: 'brave',
+  tavilyApiKey: '',
+  braveApiKey: '',
+  maxResults: 5,
+});
+
+function normalizeSearchSettings(search) {
+  const next = {
+    ...DEFAULT_SEARCH_SETTINGS,
+    ...(search && typeof search === 'object' ? search : {}),
+  };
+  const parsedMaxResults = parseInt(next.maxResults, 10);
+  const provider = String(next.provider || DEFAULT_SEARCH_SETTINGS.provider).toLowerCase();
+
+  next.enabled = !!next.enabled;
+  next.tavilyApiKey = String(next.tavilyApiKey || '');
+  next.braveApiKey = String(next.braveApiKey || '');
+  if (SEARCH_PROVIDERS.includes(provider)) {
+    next.provider = provider;
+  } else if (provider === 'auto') {
+    next.provider = next.braveApiKey || !next.tavilyApiKey ? 'brave' : 'tavily';
+  } else {
+    next.provider = DEFAULT_SEARCH_SETTINGS.provider;
+  }
+  next.maxResults = Number.isFinite(parsedMaxResults)
+    ? Math.min(8, Math.max(1, parsedMaxResults))
+    : DEFAULT_SEARCH_SETTINGS.maxResults;
+
+  return next;
+}
 
 function partialTagSuffixLength(text, tag) {
   const source = String(text || '');

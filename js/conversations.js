@@ -3,6 +3,13 @@ function newConv() {
   const id   = Date.now().toString();
   const conv = { id, name: 'New Chat', created: Date.now(), messages: [] };
   conversations.unshift(conv);
+  settings.search = normalizeSearchSettings({
+    ...getSearchSettings(),
+    enabled: false,
+  });
+  const searchToggle = $('#search-toggle');
+  if (searchToggle) searchToggle.checked = false;
+  persistSettings();
   persistConversations();
   renderConvList();
   switchConv(id);
