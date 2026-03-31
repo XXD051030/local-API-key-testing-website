@@ -1,4 +1,6 @@
 // ── Marked setup ──────────────────────────────────────────────────────────────
+import { escHtml, encodeDataValue } from './helpers.js';
+
 const mdRenderer = new marked.Renderer();
 mdRenderer.code = (...args) => {
   // marked version compatibility: renderer.code signature differs by version

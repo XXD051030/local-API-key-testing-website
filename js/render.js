@@ -1,5 +1,11 @@
 // ── Render ────────────────────────────────────────────────────────────────────
-function renderKeySelector() {
+import { settings, conversations, activeConvId, editingKeyId, normalizeAssistantMessage } from './state.js';
+import { $, escHtml, relTime, encodeDataValue } from './helpers.js';
+import { formatSearchProviderLabel } from './search.js';
+import { activeConv } from './conversations.js';
+import './marked.js';
+
+export function renderKeySelector() {
   const sel = $('#key-selector');
   if (!settings.apiKeys.length) {
     sel.innerHTML = '<option value="">No keys — add in Settings</option>';
@@ -10,24 +16,12 @@ function renderKeySelector() {
   ).join('');
 }
 
-function applyModelInput() {
+export function applyModelInput() {
   // Model selection is controlled by #model-selector (presets-only).
   // This function is kept for backward compatibility with older code paths.
 }
 
-function encodeDataValue(value) {
-  return encodeURIComponent(String(value ?? ''));
-}
-
-function decodeDataValue(value) {
-  try {
-    return decodeURIComponent(String(value ?? ''));
-  } catch (_) {
-    return String(value ?? '');
-  }
-}
-
-function sanitizeRenderedHTML(html) {
+export function sanitizeRenderedHTML(html) {
   const source = String(html || '');
   if (typeof DOMPurify?.sanitize === 'function') {
     return DOMPurify.sanitize(source, {
@@ -38,7 +32,7 @@ function sanitizeRenderedHTML(html) {
   return escHtml(source);
 }
 
-function renderMarkdownSafely(markdown) {
+export function renderMarkdownSafely(markdown) {
   const rendered = marked.parse(String(markdown || ''));
   const sanitized = sanitizeRenderedHTML(rendered);
   const tmp = document.createElement('div');
@@ -50,7 +44,7 @@ function renderMarkdownSafely(markdown) {
   return tmp.innerHTML;
 }
 
-function getMessageSearchRuns(msg) {
+export function getMessageSearchRuns(msg) {
   const runs = Array.isArray(msg?.searches)
     ? msg.searches.filter(run => run && typeof run === 'object' && run.query)
     : [];
@@ -58,7 +52,7 @@ function getMessageSearchRuns(msg) {
   return msg?.search?.query ? [msg.search] : [];
 }
 
-function buildAssistantMetaHTML(msg) {
+export function buildAssistantMetaHTML(msg) {
   const metaParts = [];
   const searchRuns = getMessageSearchRuns(msg);
   if (searchRuns.length) {
@@ -78,7 +72,7 @@ function buildAssistantMetaHTML(msg) {
     : '';
 }
 
-function buildSearchRunCardsHTML(search) {
+export function buildSearchRunCardsHTML(search) {
   const results = Array.isArray(search.results) ? search.results : [];
   if (!results.length) {
     return '<div class="search-sources-empty">No live results were returned for this query.</div>';
@@ -95,7 +89,7 @@ function buildSearchRunCardsHTML(search) {
     </a>`).join('')}</div>`;
 }
 
-function buildSearchRunHeaderHTML(search) {
+export function buildSearchRunHeaderHTML(search) {
   const shortQuery = search.query.length > 96 ? `${search.query.slice(0, 95)}…` : search.query;
   return `
     <div class="search-sources-header search-run-header">
@@ -105,7 +99,7 @@ function buildSearchRunHeaderHTML(search) {
     </div>`;
 }
 
-function buildSearchSourcesHTML(msg) {
+export function buildSearchSourcesHTML(msg) {
   const searchRuns = getMessageSearchRuns(msg);
   if (!searchRuns.length) return '';
   const totalResults = searchRuns.reduce((sum, search) => sum + (Array.isArray(search.results) ? search.results.length : 0), 0);
@@ -138,7 +132,7 @@ function buildSearchSourcesHTML(msg) {
     </details>`;
 }
 
-function buildAssistantPendingHTML(state) {
+export function buildAssistantPendingHTML(state) {
   const labels = {
     searching: 'Searching the web...',
     thinking: 'Thinking...',
@@ -152,7 +146,7 @@ function buildAssistantPendingHTML(state) {
     </div>`;
 }
 
-function renderKeyList() {
+export function renderKeyList() {
   const container = $('#key-list');
   let html = '';
 
@@ -229,7 +223,7 @@ function buildKeyForm(k) {
     </div>`;
 }
 
-function renderConvList() {
+export function renderConvList() {
   const list = $('#conv-list');
   if (!conversations.length) {
     list.innerHTML = '<div style="padding:16px 10px;font-size:12px;color:var(--text3);text-align:center">No conversations</div>';
@@ -245,7 +239,7 @@ function renderConvList() {
     </div>`).join('');
 }
 
-function renderMessages() {
+export function renderMessages() {
   const conv      = activeConv();
   const container = $('#messages');
   if (!conv || !conv.messages.length) {
@@ -261,7 +255,7 @@ function renderMessages() {
   container.scrollTop = container.scrollHeight;
 }
 
-function buildMsgHTML(msg, idx) {
+export function buildMsgHTML(msg, idx) {
   const isUser  = msg.role === 'user';
   const rowRole = isUser ? 'user' : 'assistant';
   if (!isUser) normalizeAssistantMessage(msg);
@@ -290,7 +284,7 @@ function buildMsgHTML(msg, idx) {
 }
 
 // Render assistant message content with optional thinking (collapsed by default)
-function renderAssistantContentHTML(msg, thinkingOpen) {
+export function renderAssistantContentHTML(msg, thinkingOpen) {
   const thinking = msg.thinking || '';
   const content = msg.content || '';
   const pendingHtml = !thinking && !content && msg.pendingState
@@ -302,7 +296,7 @@ function renderAssistantContentHTML(msg, thinkingOpen) {
   return `${pendingHtml}${thinkingHtml}${content ? renderMarkdownSafely(content) : ''}`;
 }
 
-function appendMsgRow(msg, idx) {
+export function appendMsgRow(msg, idx) {
   const empty = $('#empty-state');
   if (empty) empty.remove();
   const tmp = document.createElement('div');
@@ -311,7 +305,7 @@ function appendMsgRow(msg, idx) {
   $('#messages').scrollTop = $('#messages').scrollHeight;
 }
 
-function updateRegenBtn() {
+export function updateRegenBtn() {
   const conv = activeConv();
   const has  = conv && conv.messages.some(m => m.role === 'assistant');
   $('#btn-regen').style.display = has ? '' : 'none';

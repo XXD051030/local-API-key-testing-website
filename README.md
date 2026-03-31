@@ -67,11 +67,18 @@ Notes:
 
 * `index.html`: Main page structure and external asset references.
 * `style.css`: Extracted frontend styles.
-* `js/`: Frontend JavaScript files split by responsibility (`state/keys/storage/conversations/render/api/marked/events`).
+* `js/`: Frontend JavaScript files split by responsibility (`state/helpers/keys/storage/conversations/render/search/api/marked/events`).
 * `js/search.js`: Web search settings, provider selection, query preparation, and result normalization.
 * `server.py`: The backend script for handling API key testing.
 
 ## Current Version
+
+### v2.4.0
+- Migrated all JavaScript to ES Modules — eliminated global variable pollution and script load-order dependencies.
+- Added `js/helpers.js` with shared utility functions; `index.html` now uses a single `<script type="module">`.
+- Added `.gitignore` to prevent sensitive files (`settings.json`, `conversations.json`) from being committed.
+- `escHtml()` now escapes single quotes to reduce XSS surface.
+- Conversation and API key IDs now use `crypto.randomUUID()` instead of `Date.now()` to prevent collisions.
 
 ### v2.3.5
 - Assistant Markdown output is now sanitized before it is inserted into the page, reducing the risk of malicious HTML from model responses.

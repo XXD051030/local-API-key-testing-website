@@ -1,74 +1,27 @@
-// ── UI helpers ─────────────────────────────────────────────────────────────────
-function $(sel) { return document.querySelector(sel); }
-function friendlyError(e) {
-  if (e.name === 'TypeError' && e.message === 'Failed to fetch') {
-    const onLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (onLocal) {
-      return 'Failed to fetch — check your Base URL and network connection.\nIf using a VPN or firewall, try disabling it.';
-    }
-    return 'Failed to fetch — CORS blocked by browser.\n➜ Run: python3 server.py\n➜ Then open: http://localhost:8080';
-  }
-  return e.message;
-}
+// ── Application entry point ───────────────────────────────────────────────────
+import { settings, abortController, useServerStorage, setEditingKeyId, normalizeSearchSettings } from './state.js';
+import {
+  $, escHtml, toast, copyText, autoResize, decodeDataValue,
+  syncSendButton, openSettings, closeSettings, exportConversations,
+  closeMobileSidebar, toggleMobileSidebar
+} from './helpers.js';
+import {
+  getPresets, getPresetByKeyId, getPresetDisplayName, getPresetDefaultModel,
+  ensureCustomPresets, refreshPresetsDropdowns, renderPresetList,
+  syncActiveKeyModelSelection, deleteKey, saveKeyFromForm, testKeyFromForm
+} from './keys.js';
+import { persistSettings, readGeneralFromUI, init } from './storage.js';
+import { newConv, switchConv, deleteConv, clearAll, activeConv } from './conversations.js';
+import { renderKeyList, renderKeySelector, renderConvList, renderMessages, updateRegenBtn } from './render.js';
+import {
+  getSearchSettings, queueSearchToggleHeightSync,
+  readSearchSettingsFromUI, updateSearchProviderFields
+} from './search.js';
+import { sendMessage, regenFrom } from './api.js';
 
-// Routes API fetch through local proxy whenever the page is served by server.py
-async function proxyFetch(url, options) {
-  if (useServerStorage) {
-    const proxyResp = await fetch(`${window.location.origin}/proxy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url,
-        method: options.method || 'POST',
-        headers: options.headers || {},
-        bodyStr: options.body || '',
-      }),
-      signal: options.signal,
-    });
-    return proxyResp;
-  }
-  return fetch(url, options);
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function relTime(ts) {
-  const d = Date.now() - ts;
-  if (d < 60000)    return 'Just now';
-  if (d < 3600000)  return `${Math.floor(d/60000)}m ago`;
-  if (d < 86400000) return `${Math.floor(d/3600000)}h ago`;
-  return new Date(ts).toLocaleDateString();
-}
-function toast(msg, ms = 2800) {
-  const el = $('#toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), ms);
-}
-function copyText(btn, text) {
-  navigator.clipboard.writeText(text).then(() => {
-    const o = btn.textContent;
-    btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = o, 1500);
-  });
-}
-function syncSendButton() {
-  const b = $('#send-btn');
-  if (!b) return;
-  // When streaming (stop mode), keep it clickable even if model gets cleared.
-  b.disabled = !abortController && !settings.model;
-}
-function setSendStop(stop) {
-  const b = $('#send-btn');
-  b.textContent = stop ? 'Stop' : 'Send';
-  b.classList.toggle('stop', stop);
-  b.disabled = !stop && !settings.model;
-}
-function openSettings()  { closeMobileSidebar(); $('#settings-drawer').classList.add('open');  $('#overlay').classList.add('show'); }
-function closeSettings() { $('#settings-drawer').classList.remove('open'); $('#overlay').classList.remove('show'); }
+// ── Settings auto-save ───────────────────────────────────────────────────────
 let settingsAutoSaveTimer = null;
+
 async function persistSettingsSafely(showSuccess = false) {
   const ok = await persistSettings();
   if (!ok) {
@@ -78,6 +31,7 @@ async function persistSettingsSafely(showSuccess = false) {
   if (showSuccess) toast('Settings saved');
   return true;
 }
+
 function autoSaveGeneralSettings(delay = 0) {
   clearTimeout(settingsAutoSaveTimer);
   const run = async () => {
@@ -90,58 +44,15 @@ function autoSaveGeneralSettings(delay = 0) {
     run();
   }
 }
+
 function syncSearchSettingsInMemory() {
-  if (typeof readSearchSettingsFromUI === 'function') readSearchSettingsFromUI();
+  readSearchSettingsFromUI();
 }
-function updateStorageStatus() {
-  const el = $('#storage-status');
-  if (useServerStorage) {
-    el.className = 'status-badge ok';
-    el.innerHTML = `<span class="status-dot"></span> Server — saving to api/ via ${escHtml(window.location.host)}`;
-  } else {
-    el.className = 'status-badge';
-    el.innerHTML = '<span class="status-dot"></span> Browser storage (run python3 server.py for file persistence)';
-  }
-}
-function exportConversations() {
-  const blob = new Blob([JSON.stringify(conversations, null, 2)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url;
-  a.download = `conversations_${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast('Conversations exported');
-}
-function autoResize(el) {
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 200) + 'px';
-}
-const mobileSidebarQuery = window.matchMedia('(max-width: 760px)');
-function isMobileLayout() {
-  return mobileSidebarQuery.matches;
-}
-function openMobileSidebar() {
-  if (!isMobileLayout()) return;
-  document.body.classList.add('mobile-sidebar-open');
-}
-function closeMobileSidebar() {
-  document.body.classList.remove('mobile-sidebar-open');
-}
-function toggleMobileSidebar() {
-  if (!isMobileLayout()) return;
-  document.body.classList.toggle('mobile-sidebar-open');
-}
-function handleMobileLayoutChange(e) {
-  if (!e.matches) closeMobileSidebar();
-}
-if (mobileSidebarQuery.addEventListener) mobileSidebarQuery.addEventListener('change', handleMobileLayoutChange);
-else if (mobileSidebarQuery.addListener) mobileSidebarQuery.addListener(handleMobileLayoutChange);
 
 // ── Events ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   await init();
-  if (typeof queueSearchToggleHeightSync === 'function') queueSearchToggleHeightSync();
+  queueSearchToggleHeightSync();
 
   // Sidebar
   $('#btn-new').addEventListener('click', () => {
@@ -201,9 +112,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Model selector (presets-only)
   $('#model-selector').addEventListener('change', e => {
     settings.model = e.target.value;
-    const activePreset = typeof getPresetByKeyId === 'function'
-      ? getPresetByKeyId(settings.activeKeyId)
-      : null;
+    const activePreset = getPresetByKeyId(settings.activeKeyId);
     if (activePreset && settings.model && activePreset.models.includes(settings.model)) {
       activePreset.defaultModel = settings.model;
     }
@@ -234,7 +143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#btn-close-settings').addEventListener('click', closeSettings);
   $('#overlay').addEventListener('click', closeSettings);
   $('#s-search-provider')?.addEventListener('change', () => {
-    if (typeof updateSearchProviderFields === 'function') updateSearchProviderFields();
+    updateSearchProviderFields();
     autoSaveGeneralSettings();
   });
   $('#s-system-prompt')?.addEventListener('input', () => autoSaveGeneralSettings(400));
@@ -296,7 +205,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!Array.isArray(settings.thinkingModels)) settings.thinkingModels = [];
       if (deletedModel) settings.thinkingModels = settings.thinkingModels.filter(m => m !== deletedModel);
       renderPresetList(); refreshPresetsDropdowns(); persistSettings();
-      // Re-expand group
       const g = document.querySelector(`.preset-group[data-gi="${gi}"] .preset-group-body`);
       if (g) { g.style.display = ''; g.closest('.preset-group').querySelector('.preset-toggle').textContent = '▼'; }
       return;
@@ -331,13 +239,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (thinkingFlag && !settings.thinkingModels.includes(model)) settings.thinkingModels.push(model);
       }
       renderPresetList(); refreshPresetsDropdowns(); persistSettings();
-      // Re-expand group
       const g = document.querySelector(`.preset-group[data-gi="${gi}"] .preset-group-body`);
       if (g) { g.style.display = ''; g.closest('.preset-group').querySelector('.preset-toggle').textContent = '▼'; }
       return;
     }
     if (label) {
-      // Inline rename
       const gi = parseInt(label.dataset.gi);
       const group = getPresets()[gi];
       const keyId = group?.keyId;
@@ -358,7 +264,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           refreshPresetsDropdowns();
         }
         renderPresetList();
-        // Re-expand if was expanded
       };
       input.addEventListener('blur', save);
       input.addEventListener('keydown', ev => {
@@ -420,9 +325,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Add key button
   $('#btn-add-key').addEventListener('click', () => {
-    editingKeyId = 'new';
+    setEditingKeyId('new');
     renderKeyList();
-    // Scroll to top of key-list
     $('#key-list').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
@@ -437,12 +341,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const keyItem   = e.target.closest('.key-item');
 
     if (editBtn) {
-      editingKeyId = editBtn.closest('.key-item').dataset.id;
+      setEditingKeyId(editBtn.closest('.key-item').dataset.id);
       renderKeyList();
     } else if (delBtn) {
       deleteKey(delBtn.closest('.key-item').dataset.id);
     } else if (cancelBtn) {
-      editingKeyId = null;
+      setEditingKeyId(null);
       renderKeyList();
     } else if (saveBtn) {
       saveKeyFromForm(saveBtn.closest('.key-form'));
@@ -453,7 +357,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       inp.type = inp.type === 'password' ? 'text' : 'password';
       toggleBtn.textContent = inp.type === 'password' ? 'Show' : 'Hide';
     } else if (keyItem && !e.target.closest('.key-item-btns')) {
-      // Click on key item to make it active
       settings.activeKeyId = keyItem.dataset.id;
       renderKeyList();
       renderKeySelector();
@@ -480,6 +383,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('resize', () => {
-    if (typeof queueSearchToggleHeightSync === 'function') queueSearchToggleHeightSync();
+    queueSearchToggleHeightSync();
   });
 }

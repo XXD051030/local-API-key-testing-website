@@ -67,11 +67,18 @@
 
 * `index.html`: 主页面结构，以及外部资源的引用入口。
 * `style.css`: 独立拆分出的前端样式文件。
-* `js/`: 按职责拆分的前端 JavaScript 文件（`state/keys/storage/conversations/render/api/marked/events`）。
+* `js/`: 按职责拆分的前端 JavaScript 文件（`state/helpers/keys/storage/conversations/render/search/api/marked/events`）。
 * `js/search.js`: 联网搜索设置、provider 选择、查询构造与结果标准化逻辑。
 * `server.py`: 用于处理 API Key 测试的后端脚本。
 
 ## 当前版本
+
+### v2.4.0
+- 全部 JavaScript 迁移为 ES Modules —— 消除全局变量污染和脚本加载顺序依赖。
+- 新增 `js/helpers.js` 共享工具模块；`index.html` 改为单个 `<script type="module">`。
+- 新增 `.gitignore`，防止敏感文件（`settings.json`、`conversations.json`）被提交。
+- `escHtml()` 现在转义单引号，降低 XSS 风险。
+- 会话和 API Key 的 ID 生成改用 `crypto.randomUUID()`，杜绝碰撞。
 
 ### v2.3.5
 - assistant 的 Markdown 输出现在会在插入页面前先经过清洗，降低模型回复中恶意 HTML 注入页面的风险。

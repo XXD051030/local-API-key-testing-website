@@ -1,5 +1,23 @@
 // ── Chat ──────────────────────────────────────────────────────────────────────
-async function sendMessage() {
+import {
+  settings, abortController, setAbortController,
+  normalizeAssistantMessage, splitEmbeddedThinking, mergeThinkingParts
+} from './state.js';
+import { $, toast, proxyFetch, friendlyError, setSendStop, openSettings } from './helpers.js';
+import { getActiveKey } from './keys.js';
+import {
+  renderAssistantContentHTML, appendMsgRow, updateRegenBtn,
+  renderMessages, renderConvList, buildAssistantMetaHTML, buildSearchSourcesHTML
+} from './render.js';
+import {
+  getSearchSettings, usesAgentSearch, buildSearchQuery, searchWebQuery,
+  maybeSearchWeb, buildSearchAgentInstructions, buildSearchToolDefinitions,
+  buildCurrentDateTimeContext, executeSearchToolCall
+} from './search.js';
+import { newConv, activeConv, autoNameConv } from './conversations.js';
+import { persistConversations } from './storage.js';
+
+export async function sendMessage() {
   const input = $('#user-input');
   const text  = input.value.trim();
   if (!text || abortController) return;
@@ -8,7 +26,7 @@ async function sendMessage() {
   if (!activeKey) { toast('Add an API key in Settings first'); openSettings(); return; }
   if (!settings.model) { toast('Select a model above the chat box'); return; }
 
-  if (!activeConvId) newConv();
+  if (!activeConv()) newConv();
   const conv = activeConv();
 
   const userMsg = { role: 'user', content: text, time: Date.now() };
@@ -29,7 +47,7 @@ async function sendMessage() {
   const contentEl = lastRow.querySelector('.msg-content');
 
   setSendStop(true);
-  abortController = new AbortController();
+  setAbortController(new AbortController());
   try {
     await callAPI(conv, contentEl, assistantMsg, activeKey);
   } catch(e) {
@@ -45,7 +63,7 @@ async function sendMessage() {
     contentEl.innerHTML = renderAssistantContentHTML(assistantMsg, false);
     updateMsgMeta(contentEl, assistantMsg);
     setSendStop(false);
-    abortController = null;
+    setAbortController(null);
     persistConversations();
     updateRegenBtn();
     $('#messages').scrollTop = $('#messages').scrollHeight;
@@ -382,7 +400,6 @@ async function readStream(resp, contentEl, assistantMsg) {
           ensureStreamingCursor();
           rawContent += deltaContent;
           syncAssistantMessage();
-          // If we already have thinking content, collapse it as soon as output starts.
           if (contentStarted && assistantMsg.thinking && thinkingDetailsOpen) {
             thinkingDetailsOpen = false;
           }
@@ -394,7 +411,6 @@ async function readStream(resp, contentEl, assistantMsg) {
           ensureStreamingCursor();
           rawThinking += deltaThinking;
           syncAssistantMessage();
-          // Do not reopen thinking once normal content has started streaming.
           if (!contentStarted && !streamFinished) thinkingDetailsOpen = true;
           requestRender();
         }
@@ -405,13 +421,12 @@ async function readStream(resp, contentEl, assistantMsg) {
   }
 }
 
-async function regenFrom(idx) {
+export async function regenFrom(idx) {
   const conv = activeConv();
   if (!conv || abortController) return;
   conv.messages = conv.messages.slice(0, idx);
   persistConversations();
   renderMessages();
-  // Re-trigger send using trimmed conv
   const activeKey = getActiveKey();
   if (!activeKey) { toast('No active API key'); return; }
   if (!settings.model) { toast('Select a model above the chat box'); return; }
@@ -423,7 +438,7 @@ async function regenFrom(idx) {
   const contentEl = lastRow.querySelector('.msg-content');
 
   setSendStop(true);
-  abortController = new AbortController();
+  setAbortController(new AbortController());
   try {
     await callAPI(conv, contentEl, assistantMsg, activeKey);
   } catch(e) {
@@ -434,7 +449,7 @@ async function regenFrom(idx) {
     contentEl.innerHTML = renderAssistantContentHTML(assistantMsg, false);
     updateMsgMeta(contentEl, assistantMsg);
     setSendStop(false);
-    abortController = null;
+    setAbortController(null);
     persistConversations();
     updateRegenBtn();
   }

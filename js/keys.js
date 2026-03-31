@@ -1,39 +1,44 @@
 // ── Key-bound Model presets ───────────────────────────────────────────────────
-function isKeyBoundPresetGroup(g) {
+import { settings, editingKeyId, setEditingKeyId } from './state.js';
+import { $, escHtml, toast, proxyFetch, friendlyError, syncSendButton } from './helpers.js';
+import { renderKeyList, renderKeySelector } from './render.js';
+import { persistSettings } from './storage.js';
+
+export function isKeyBoundPresetGroup(g) {
   return g
     && typeof g === 'object'
     && typeof g.keyId === 'string'
     && Array.isArray(g.models);
 }
 
-function getPresets() {
+export function getPresets() {
   return Array.isArray(settings.presets) ? settings.presets : [];
 }
 
-function getPresetByKeyId(keyId) {
+export function getPresetByKeyId(keyId) {
   return getPresets().find(group => group?.keyId === keyId) || null;
 }
 
-function getPresetDisplayName(group) {
+export function getPresetDisplayName(group) {
   if (!group) return '';
   const key = settings.apiKeys.find(item => item.id === group.keyId);
   return String(key?.name || group.keyName || group.label || '').trim();
 }
 
-function getPresetDefaultModel(group) {
+export function getPresetDefaultModel(group) {
   if (!group || !Array.isArray(group.models) || !group.models.length) return '';
   const defaultModel = String(group.defaultModel || '').trim();
   return group.models.includes(defaultModel) ? defaultModel : group.models[0];
 }
 
-function ensureActiveKeySelection() {
+export function ensureActiveKeySelection() {
   const hasActiveKey = settings.apiKeys.some(key => key.id === settings.activeKeyId);
   if (hasActiveKey) return settings.activeKeyId;
   settings.activeKeyId = settings.apiKeys[0]?.id || null;
   return settings.activeKeyId;
 }
 
-function normalizePresetGroup(group, key) {
+export function normalizePresetGroup(group, key) {
   const models = Array.from(new Set(
     (Array.isArray(group?.models) ? group.models : [])
       .map(model => String(model || '').trim())
@@ -53,7 +58,7 @@ function normalizePresetGroup(group, key) {
 }
 
 // Kept for backward compatibility with existing preset-management code paths.
-function ensureCustomPresets() {
+export function ensureCustomPresets() {
   if (!Array.isArray(settings.presets)) settings.presets = [];
 
   // Discard old preset shapes that do not include keyId.
@@ -66,7 +71,7 @@ function ensureCustomPresets() {
   });
 }
 
-function buildPresetsHTML(groups) {
+export function buildPresetsHTML(groups) {
   const list = Array.isArray(groups) ? groups : getPresets();
   return list
     .map(g =>
@@ -75,7 +80,7 @@ function buildPresetsHTML(groups) {
     .join('');
 }
 
-function refreshPresetsDropdowns(options = {}) {
+export function refreshPresetsDropdowns(options = {}) {
   const sel = $('#model-selector');
   if (!sel) return;
 
@@ -105,13 +110,13 @@ function refreshPresetsDropdowns(options = {}) {
   return settings.model;
 }
 
-function syncActiveKeyModelSelection(options = {}) {
+export function syncActiveKeyModelSelection(options = {}) {
   ensureCustomPresets();
   ensureActiveKeySelection();
   return refreshPresetsDropdowns(options);
 }
 
-function renderPresetList() {
+export function renderPresetList() {
   const container = $('#preset-list');
   const presets = getPresets();
   container.innerHTML = presets.map((g, gi) => `
@@ -148,17 +153,17 @@ function renderPresetList() {
 }
 
 // ── Key management ────────────────────────────────────────────────────────────
-function getActiveKey() {
+export function getActiveKey() {
   return settings.apiKeys.find(k => k.id === settings.activeKeyId) || null;
 }
 
-function deleteKey(id) {
+export function deleteKey(id) {
   if (!confirm('Delete this API key?')) return;
   settings.apiKeys = settings.apiKeys.filter(k => k.id !== id);
   if (settings.activeKeyId === id) {
     settings.activeKeyId = settings.apiKeys[0]?.id || null;
   }
-  if (editingKeyId === id) editingKeyId = null;
+  if (editingKeyId === id) setEditingKeyId(null);
 
   if (Array.isArray(settings.presets)) {
     settings.presets = settings.presets.filter(p => p.keyId !== id);
@@ -172,7 +177,7 @@ function deleteKey(id) {
   persistSettings();
 }
 
-function saveKeyFromForm(form) {
+export function saveKeyFromForm(form) {
   const name  = form.querySelector('.kf-name').value.trim();
   const url   = form.querySelector('.kf-url').value.trim().replace(/\/$/, '');
   const key   = form.querySelector('.kf-key').value.trim();
@@ -183,7 +188,7 @@ function saveKeyFromForm(form) {
 
   const editId = form.dataset.editing;
   if (editId === 'new') {
-    const newK = { id: 'key_' + Date.now(), name, baseUrl: url, key };
+    const newK = { id: 'key_' + crypto.randomUUID(), name, baseUrl: url, key };
     settings.apiKeys.push(newK);
     if (settings.apiKeys.length === 1) {
       settings.activeKeyId = newK.id;
@@ -211,7 +216,7 @@ function saveKeyFromForm(form) {
     ensureCustomPresets();
   }
 
-  editingKeyId = null;
+  setEditingKeyId(null);
   renderKeyList();
   renderKeySelector();
   syncActiveKeyModelSelection();
@@ -220,7 +225,7 @@ function saveKeyFromForm(form) {
   toast('Key saved');
 }
 
-async function testKeyFromForm(form) {
+export async function testKeyFromForm(form) {
   const url   = form.querySelector('.kf-url').value.trim().replace(/\/$/, '');
   const key   = form.querySelector('.kf-key').value.trim();
   const editId = form.dataset.editing;
@@ -279,7 +284,7 @@ async function testKeyFromForm(form) {
     statusEl.className = 'kf-test-status status-badge show err';
     const msg = e.name === 'AbortError' ? 'Connection timed out (20s)' : friendlyError(e);
     statusEl.style.cssText += ';white-space:pre-wrap;max-width:100%;border-radius:6px;padding:8px 10px';
-    statusEl.innerHTML = `<span class="status-dot" style="flex-shrink:0"></span> <span>${escHtml(msg)}</span>`;
+    statusEl.innerHTML = `<span class="status-dot"></span> <span>${escHtml(msg)}</span>`;
   } finally {
     testBtn.disabled = false;
   }

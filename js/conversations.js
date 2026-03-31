@@ -1,6 +1,13 @@
 // ── Conversation management ───────────────────────────────────────────────────
-function newConv() {
-  const id   = Date.now().toString();
+import { settings, conversations, activeConvId, setConversations, setActiveConvId } from './state.js';
+import { normalizeSearchSettings } from './state.js';
+import { $ } from './helpers.js';
+import { getSearchSettings } from './search.js';
+import { persistSettings, persistConversations } from './storage.js';
+import { renderConvList, renderMessages, updateRegenBtn } from './render.js';
+
+export function newConv() {
+  const id   = crypto.randomUUID();
   const conv = { id, name: 'New Chat', created: Date.now(), messages: [] };
   conversations.unshift(conv);
   settings.search = normalizeSearchSettings({
@@ -15,40 +22,40 @@ function newConv() {
   switchConv(id);
 }
 
-function switchConv(id) {
-  activeConvId = id;
+export function switchConv(id) {
+  setActiveConvId(id);
   renderConvList();
   renderMessages();
   updateRegenBtn();
 }
 
-function deleteConv(id) {
+export function deleteConv(id) {
   const conv = conversations.find(c => c.id === id) || null;
   const label = conv?.name ? ` "${conv.name}"` : '';
   if (!confirm(`Delete conversation${label}? This cannot be undone.`)) return;
-  conversations = conversations.filter(c => c.id !== id);
-  if (activeConvId === id) activeConvId = conversations[0]?.id || null;
+  setConversations(conversations.filter(c => c.id !== id));
+  if (activeConvId === id) setActiveConvId(conversations[0]?.id || null);
   persistConversations();
   renderConvList();
   renderMessages();
   updateRegenBtn();
 }
 
-function clearAll() {
+export function clearAll() {
   if (!confirm('Delete all conversations? This cannot be undone.')) return;
-  conversations = [];
-  activeConvId  = null;
+  setConversations([]);
+  setActiveConvId(null);
   persistConversations();
   renderConvList();
   renderMessages();
   updateRegenBtn();
 }
 
-function activeConv() {
+export function activeConv() {
   return conversations.find(c => c.id === activeConvId) || null;
 }
 
-function autoNameConv(conv) {
+export function autoNameConv(conv) {
   if (conv.name !== 'New Chat') return;
   const first = conv.messages.find(m => m.role === 'user');
   if (first) conv.name = first.content.slice(0, 42) + (first.content.length > 42 ? '…' : '');

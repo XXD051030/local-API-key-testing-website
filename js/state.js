@@ -1,5 +1,5 @@
 // ── State ─────────────────────────────────────────────────────────────────────
-let settings = {
+export let settings = {
   activeKeyId: null,
   apiKeys: [],        // [{id, name, baseUrl, key}]
   model: '',
@@ -18,19 +18,28 @@ let settings = {
     maxResults: 5,
   },
 };
-let conversations = [];
-let activeConvId = null;
-let abortController = null;
-let editingKeyId = null;  // null | 'new' | '<id>'
-let useServerStorage = false;
+export let conversations = [];
+export let activeConvId = null;
+export let abortController = null;
+export let editingKeyId = null;  // null | 'new' | '<id>'
+export let useServerStorage = false;
 
-const SETTINGS_FILE = 'settings.json';
-const CONV_FILE     = 'conversations.json';
+// ── Setters (needed because imported bindings are read-only) ──────────────────
+export function setSettings(s) { settings = s; }
+export function setConversations(c) { conversations = c; }
+export function setActiveConvId(id) { activeConvId = id; }
+export function setAbortController(ac) { abortController = ac; }
+export function setEditingKeyId(id) { editingKeyId = id; }
+export function setUseServerStorage(v) { useServerStorage = v; }
 
-const THINK_OPEN_TAG  = '<think>';
-const THINK_CLOSE_TAG = '</think>';
-const SEARCH_PROVIDERS = ['brave', 'tavily'];
-const DEFAULT_SEARCH_SETTINGS = Object.freeze({
+// ── Constants ─────────────────────────────────────────────────────────────────
+export const SETTINGS_FILE = 'settings.json';
+export const CONV_FILE     = 'conversations.json';
+
+export const THINK_OPEN_TAG  = '<think>';
+export const THINK_CLOSE_TAG = '</think>';
+export const SEARCH_PROVIDERS = ['brave', 'tavily'];
+export const DEFAULT_SEARCH_SETTINGS = Object.freeze({
   enabled: false,
   provider: 'brave',
   tavilyApiKey: '',
@@ -38,7 +47,8 @@ const DEFAULT_SEARCH_SETTINGS = Object.freeze({
   maxResults: 5,
 });
 
-function normalizeSearchSettings(search) {
+// ── Pure functions ────────────────────────────────────────────────────────────
+export function normalizeSearchSettings(search) {
   const next = {
     ...DEFAULT_SEARCH_SETTINGS,
     ...(search && typeof search === 'object' ? search : {}),
@@ -63,7 +73,7 @@ function normalizeSearchSettings(search) {
   return next;
 }
 
-function partialTagSuffixLength(text, tag) {
+export function partialTagSuffixLength(text, tag) {
   const source = String(text || '');
   for (let len = Math.min(source.length, tag.length - 1); len > 0; len--) {
     if (source.endsWith(tag.slice(0, len))) return len;
@@ -71,7 +81,7 @@ function partialTagSuffixLength(text, tag) {
   return 0;
 }
 
-function splitEmbeddedThinking(rawContent) {
+export function splitEmbeddedThinking(rawContent) {
   const source = String(rawContent || '');
   const trimmedStart = source.trimStart();
   if (!trimmedStart) return { content: source, thinking: '', inThink: false };
@@ -144,7 +154,7 @@ function splitEmbeddedThinking(rawContent) {
   return { content, thinking, inThink };
 }
 
-function mergeThinkingParts(primaryThinking, embeddedThinking) {
+export function mergeThinkingParts(primaryThinking, embeddedThinking) {
   const primary = String(primaryThinking || '');
   const embedded = String(embeddedThinking || '');
   if (!primary) return embedded;
@@ -153,7 +163,7 @@ function mergeThinkingParts(primaryThinking, embeddedThinking) {
   return `${primary}${primary.endsWith('\n') ? '\n' : '\n\n'}${embedded}`;
 }
 
-function normalizeAssistantMessage(msg) {
+export function normalizeAssistantMessage(msg) {
   if (!msg || msg.role !== 'assistant') return false;
 
   const originalContent = String(msg.content || '');
@@ -174,7 +184,7 @@ function normalizeAssistantMessage(msg) {
   return changed;
 }
 
-function normalizeConversations(list) {
+export function normalizeConversations(list) {
   if (!Array.isArray(list)) return false;
 
   let changed = false;
