@@ -97,7 +97,7 @@ export function normalizeSearchText(text, limit) {
 }
 
 export function shouldIncludeTimeContext() {
-  return settings.includeTimeContext !== false;
+  return settings.includeTimeContext === true;
 }
 
 export function getSearchSourceLabel(url) {

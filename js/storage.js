@@ -86,7 +86,7 @@ export async function loadSettingsFromFile() {
 
 export function applySettingsToUI() {
   $('#s-system-prompt').value = settings.systemPrompt || '';
-  $('#s-include-time-context').value = (settings.includeTimeContext !== false).toString();
+  $('#s-include-time-context').value = (settings.includeTimeContext === true).toString();
   $('#s-temperature').value   = settings.temperature ?? 0.7;
   $('#temp-val').textContent  = settings.temperature ?? 0.7;
   $('#s-max-tokens').value    = settings.maxTokens || '';
@@ -103,7 +103,7 @@ export function applySettingsToUI() {
 
 export function readGeneralFromUI() {
   settings.systemPrompt = $('#s-system-prompt').value;
-  settings.includeTimeContext = $('#s-include-time-context')?.value !== 'false';
+  settings.includeTimeContext = $('#s-include-time-context')?.value === 'true';
   settings.temperature  = parseFloat($('#s-temperature').value);
   settings.maxTokens    = $('#s-max-tokens').value;
   settings.stream       = $('#s-stream').value === 'true';

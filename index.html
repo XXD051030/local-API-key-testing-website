@@ -122,10 +122,10 @@
         <div class="field-group">
           <label class="field-label">Current Time Context</label>
           <select class="field-select" id="s-include-time-context">
+            <option value="false">Disabled (default)</option>
             <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
           </select>
-          <div class="field-desc">Adds the current local date/time and time zone to each request. Helpful for words like "today" or "latest", but uses extra tokens.</div>
+          <div class="field-desc">Adds the current local date/time and time zone to each request. Helpful for words like "today" or "latest", but uses extra tokens on every call. Off by default.</div>
         </div>
         <div class="field-group">
           <label class="field-label" style="display:flex;justify-content:space-between">

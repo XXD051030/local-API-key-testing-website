@@ -4,7 +4,7 @@ export let settings = {
   apiKeys: [],        // [{id, name, baseUrl, key}]
   model: '',
   systemPrompt: '',
-  includeTimeContext: true,
+  includeTimeContext: false,
   temperature: 0.7,
   maxTokens: '',
   stream: true,
