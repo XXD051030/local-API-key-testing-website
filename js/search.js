@@ -256,7 +256,7 @@ export async function searchWebQuery(query, options = {}, signal) {
   const normalizedQuery = normalizeSearchText(query, 300);
   if (!normalizedQuery) throw new Error('Search query is required.');
   if (!useServerStorage) {
-    throw new Error('Web Search requires the local server. Run python3 server.py and open http://localhost:8080.');
+    throw new Error('Web Search requires the local backend. Open the desktop app, or run python3 server.py and use http://localhost:8080.');
   }
   const preferredProvider = String(options.provider || search.provider || 'brave').toLowerCase();
   const provider = resolveSearchProvider(search, preferredProvider);

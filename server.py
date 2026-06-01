@@ -20,8 +20,13 @@ import sys
 import datetime
 from urllib.parse import urlparse, parse_qs, urlencode
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# STATIC_DIR holds read-only frontend assets (index.html / style.css / js/).
+# DATA_DIR holds writable user data (settings.json / conversations.json).
+# Both default to the script directory so plain `python3 server.py` is unchanged;
+# the desktop launcher (app.py) overrides them via run_server().
+STATIC_DIR = BASE_DIR
+DATA_DIR = BASE_DIR
 ALLOWED_FILES = {'settings.json', 'conversations.json'}
 DEFAULT_SEARCH_MAX_RESULTS = 5
 MAX_SEARCH_RESULTS = 8
@@ -145,7 +150,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({'error': {'message': 'Forbidden file'}}).encode())
             return
-        filepath = os.path.join(BASE_DIR, name)
+        filepath = os.path.join(DATA_DIR, name)
         if not os.path.exists(filepath):
             self.send_response(404)
             self._cors()
@@ -170,7 +175,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return
         length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(length)
-        filepath = os.path.join(BASE_DIR, name)
+        os.makedirs(DATA_DIR, exist_ok=True)
+        filepath = os.path.join(DATA_DIR, name)
         try:
             data = json.loads(body)
         except json.JSONDecodeError as e:
@@ -444,10 +450,31 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         print(f'  {ts}  {code_out}  {label:5}  {detail}')
 
 
-if __name__ == '__main__':
-    os.chdir(BASE_DIR)
-    print(f'\n  API Tester running at http://localhost:{PORT}')
-    print(f'  Files stored in: {BASE_DIR}')
-    print(f'  Press Ctrl+C to stop\n')
-    with http.server.HTTPServer(('', PORT), Handler) as httpd:
+def run_server(host='', port=8080, static_dir=None, data_dir=None, serve_forever=True):
+    """Start the HTTP server.
+
+    Returns the bound HTTPServer instance. When serve_forever is False the
+    caller is responsible for driving it (e.g. the desktop launcher runs
+    serve_forever() on a background thread). The actual bound port is available
+    via the returned server's server_address, which matters when port=0.
+    """
+    global STATIC_DIR, DATA_DIR
+    if static_dir:
+        STATIC_DIR = static_dir
+    if data_dir:
+        DATA_DIR = data_dir
+    os.makedirs(DATA_DIR, exist_ok=True)
+    os.chdir(STATIC_DIR)
+    httpd = http.server.HTTPServer((host, port), Handler)
+    if serve_forever:
         httpd.serve_forever()
+    return httpd
+
+
+if __name__ == '__main__':
+    PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+    print(f'\n  API Tester running at http://localhost:{PORT}')
+    print(f'  Static files: {STATIC_DIR}')
+    print(f'  Data files:   {DATA_DIR}')
+    print(f'  Press Ctrl+C to stop\n')
+    run_server(host='', port=PORT)
