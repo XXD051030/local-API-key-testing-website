@@ -1126,6 +1126,49 @@ body {
 }
 #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
+/* Import modal */
+.modal {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.6);
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal.show { display: flex; }
+.modal-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 400px;
+  padding: 20px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+}
+.modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.modal-body {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+.modal-body p { margin: 0 0 8px; }
+.modal-body ul { margin: 0 0 8px; padding-left: 20px; }
+.modal-body b { color: var(--text); }
+.modal-note { color: var(--text3); font-size: 12px; }
+.modal-warn { color: var(--danger); font-size: 12px; }
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
 @media (hover: none), (pointer: coarse) {
   .conv-del,
   .msg-actions {

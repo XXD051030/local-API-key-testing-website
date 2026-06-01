@@ -18,6 +18,7 @@ import {
   readSearchSettingsFromUI, updateSearchProviderFields
 } from './search.js';
 import { sendMessage, regenFrom } from './api.js';
+import { exportBackup, importBackupFromFile, confirmImport, closeImportModal } from './transfer.js';
 
 // ── Settings auto-save ───────────────────────────────────────────────────────
 let settingsAutoSaveTimer = null;
@@ -142,6 +143,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#btn-settings').addEventListener('click', openSettings);
   $('#btn-close-settings').addEventListener('click', closeSettings);
   $('#overlay').addEventListener('click', closeSettings);
+
+  // Backup — export / import full data
+  $('#btn-export-backup').addEventListener('click', exportBackup);
+  $('#btn-import-backup').addEventListener('click', () => $('#import-file-input').click());
+  $('#import-file-input').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';  // allow re-selecting the same file later
+    await importBackupFromFile(file);
+  });
+  $('#import-replace').addEventListener('click', () => confirmImport('replace'));
+  $('#import-merge').addEventListener('click', () => confirmImport('merge'));
+  $('#import-cancel').addEventListener('click', closeImportModal);
+  $('#import-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'import-modal') closeImportModal();
+  });
   $('#s-search-provider')?.addEventListener('change', () => {
     updateSearchProviderFields();
     autoSaveGeneralSettings();

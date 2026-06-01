@@ -219,8 +219,35 @@
         Run <code>python3 server.py</code> to save data to <code>settings.json</code> and <code>conversations.json</code> in the <code>api/</code> folder.
         Otherwise data is saved to browser storage.
       </div>
+      <div class="row-group" style="margin-top:12px">
+        <button class="btn-secondary" id="btn-export-backup" style="flex:1">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export Backup
+        </button>
+        <button class="btn-secondary" id="btn-import-backup" style="flex:1">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Import Backup
+        </button>
+        <input type="file" id="import-file-input" accept="application/json,.json" style="display:none">
+      </div>
+      <div class="field-desc" style="margin-top:8px">
+        Backup includes all conversations and settings (API keys in plain text). Keep the file private.
+      </div>
     </div>
 
+  </div>
+</div>
+
+<!-- Import Backup Modal -->
+<div id="import-modal" class="modal">
+  <div class="modal-card">
+    <div class="modal-title">Import Backup</div>
+    <div class="modal-body" id="import-summary"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="import-cancel">Cancel</button>
+      <button class="btn-secondary" id="import-merge">Merge</button>
+      <button class="btn-primary" id="import-replace">Replace</button>
+    </div>
   </div>
 </div>
 
