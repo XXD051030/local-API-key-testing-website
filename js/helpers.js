@@ -38,7 +38,7 @@ export function friendlyError(e) {
     if (onLocal) {
       return 'Failed to fetch — check your Base URL and network connection.\nIf using a VPN or firewall, try disabling it.';
     }
-    return 'Failed to fetch — CORS blocked by browser.\n➜ Run: python3 server.py\n➜ Then open: http://localhost:8080';
+    return 'Failed to fetch — CORS blocked by browser.\n➜ Use the desktop app, or run: python3 server.py\n➜ Then open: http://localhost:8080';
   }
   return e.message;
 }

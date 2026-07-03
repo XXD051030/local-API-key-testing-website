@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     persistSettings();
     if (e.target.checked && !useServerStorage) {
-      toast('Web Search requires python3 server.py and http://localhost:8080');
+      toast('Web Search requires the local backend (desktop app, or python3 server.py)');
     }
   });
 
