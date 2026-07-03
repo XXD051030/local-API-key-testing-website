@@ -5,8 +5,6 @@
 
 import sys
 
-block_cipher = None
-
 # App icon: macOS uses .icns (on the BUNDLE), Windows uses .ico (on the EXE).
 icon_file = 'img/icon.icns' if sys.platform == 'darwin' else 'img/icon.ico'
 
@@ -29,38 +27,43 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
 )
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    name='APITester',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    runtime_tmpdir=None,
-    console=False,  # GUI app, no terminal window
-    disable_windowed_traceback=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon=icon_file,
-)
-
-# On macOS wrap the executable in a proper .app bundle.
 if sys.platform == 'darwin':
-    app = BUNDLE(
+    # onedir mode. onefile is a bad fit for macOS: every launch re-extracts
+    # the whole runtime to a fresh temp dir, so Gatekeeper re-verifies every
+    # library each time (~tens of seconds cold start), and until the window
+    # finally appears extra Finder clicks spawn extra instances. With onedir
+    # nothing is extracted at runtime and the .app hides the folder anyway.
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name='APITester',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=False,  # UPX does not support macOS binaries
+        console=False,  # GUI app, no terminal window
+        disable_windowed_traceback=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon=icon_file,
+    )
+    coll = COLLECT(
         exe,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=False,
+        name='APITester',
+    )
+    app = BUNDLE(
+        coll,
         name='APITester.app',
         icon='img/icon.icns',
         bundle_identifier='com.apitester.desktop',
@@ -69,4 +72,27 @@ if sys.platform == 'darwin':
             'CFBundleName': 'API Tester',
             'CFBundleDisplayName': 'API Tester',
         },
+    )
+else:
+    # Windows keeps onefile: a single portable APITester.exe is the expected
+    # distribution format there. The single-instance lock in app.py covers
+    # the double-launch problem on both platforms.
+    exe = EXE(
+        pyz,
+        a.scripts,
+        a.binaries,
+        a.datas,
+        [],
+        name='APITester',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        runtime_tmpdir=None,
+        console=False,  # GUI app, no terminal window
+        disable_windowed_traceback=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon=icon_file,
     )
