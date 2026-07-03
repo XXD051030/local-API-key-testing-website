@@ -3,7 +3,8 @@
 <p align="center"><strong>A local API key testing website for multiple AI providers.</strong></p>
 
 <p align="center">
-  A simple local web interface and backend for testing API keys across different AI model providers.
+  A simple local web interface and backend for testing API keys across different AI model providers.<br>
+  Now also available as a standalone desktop app for macOS and Windows.
 </p>
 
 <p align="center">
@@ -11,11 +12,23 @@
 
 <p align="center">English | <a href="./READMECN.md">Chinese</a></p>
 
-## Requirements
+## Desktop App (Recommended)
 
-* Python 3.x
+Download the standalone desktop app from [Releases](https://github.com/XXD051030/local-API-key-testing-website/releases) — no Python or any setup required:
 
-## Usage
+* **macOS**: download `APITester-macOS.zip`, unzip, and open `APITester.app`. On first launch, right-click the app and choose `Open` to bypass the unsigned-app warning.
+* **Windows**: download `APITester.exe` and double-click it. If SmartScreen appears, click `More info` -> `Run anyway`.
+
+Settings and conversations are stored in the system user-data directory, so they survive app updates:
+
+* macOS: `~/Library/Application Support/APITester/`
+* Windows: `%APPDATA%\APITester\`
+
+To build the app yourself, see [build.md](./build.md).
+
+## Run from Source
+
+Requirements: Python 3.x
 
 ### Windows
 
@@ -49,16 +62,15 @@
 
 The app can now search the web before sending your prompt to the selected chat model.
 
-1. Start the local backend with `python3 server.py` or `py server.py`.
-2. Open the app through that backend URL, such as `http://localhost:8080`.
-3. In `Settings -> Web Search`, choose either `Brave` or `Tavily`.
-4. Expand `Provider API Key`, then save the API key for the currently selected provider.
-5. Use the `Web Search` switch next to the model selector to turn live search on or off per chat request.
-6. When enabled, the model decides whether to call `search_web`, and the assistant reply will include a compact `Sources` block when search was used.
+1. Open the desktop app, or start the backend from source (`python3 server.py` / `py server.py`) and visit `http://localhost:8080`.
+2. In `Settings -> Web Search`, choose either `Brave` or `Tavily`.
+3. Expand `Provider API Key`, then save the API key for the currently selected provider.
+4. Use the `Web Search` switch next to the model selector to turn live search on or off per chat request.
+5. When enabled, the model decides whether to call `search_web`, and the assistant reply will include a compact `Sources` block when search was used.
 
 Notes:
 
-* Live web search requires the local backend; it is not available in browser-only mode.
+* Live web search requires the local backend. The desktop app has it built in; it is only unavailable in browser-only mode (opening `index.html` without the backend).
 * Live web search now defaults to `Model decides`, so your current chat model needs OpenAI-compatible tool calling support.
 * Only one search provider is active at a time: `Brave` or `Tavily`.
 * While the model is deciding whether to search and before the first streamed tokens arrive, the assistant row now shows `Thinking...` immediately instead of staying blank.
@@ -70,8 +82,20 @@ Notes:
 * `js/`: Frontend JavaScript files split by responsibility (`state/helpers/keys/storage/conversations/render/search/api/marked/events`).
 * `js/search.js`: Web search settings, provider selection, query preparation, and result normalization.
 * `server.py`: The backend script for handling API key testing.
+* `app.py`: Desktop launcher — runs the backend in a background thread and opens a native window (pywebview).
+* `build.spec` / `build.md`: PyInstaller packaging config and step-by-step build instructions for macOS and Windows.
+* `requirements.txt`: Dependencies for building the desktop app (`pywebview`, `pyinstaller`).
+* `img/`: App logo and icons.
 
 ## Current Version
+
+### v3.0.0
+- Packaged as a standalone desktop app for **macOS and Windows** (pywebview + PyInstaller) — download from [Releases](https://github.com/XXD051030/local-API-key-testing-website/releases), no Python required.
+- The desktop app stores settings and conversations in the system user-data directory (`~/Library/Application Support/APITester/` on macOS, `%APPDATA%\APITester\` on Windows), so data survives updates and reinstalls.
+- Fixed slow launch and duplicate app instances.
+- Added one-click import/export of conversations and settings.
+- Time context is now disabled by default to save tokens.
+- Running from source (`python3 server.py`) still works unchanged.
 
 ### v2.4.0
 - Migrated all JavaScript to ES Modules — eliminated global variable pollution and script load-order dependencies.
