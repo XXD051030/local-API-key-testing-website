@@ -19,6 +19,7 @@ import {
 } from './search.js';
 import { sendMessage, regenFrom } from './api.js';
 import { exportBackup, importBackupFromFile, confirmImport, closeImportModal } from './transfer.js';
+import { initTheme } from './theme.js';
 
 // ── Settings auto-save ───────────────────────────────────────────────────────
 let settingsAutoSaveTimer = null;
@@ -53,6 +54,7 @@ function syncSearchSettingsInMemory() {
 // ── Events ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   await init();
+  initTheme();
   queueSearchToggleHeightSync();
 
   // Sidebar
