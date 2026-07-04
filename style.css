@@ -8,26 +8,38 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0f0f0f;
-  --bg2: #1a1a1a;
-  --bg3: #242424;
-  --bg4: #2e2e2e;
-  --border: #333;
-  --text: #e8e8e8;
-  --text2: #999;
-  --text3: #555;
-  --accent: #6c63ff;
-  --accent-h: #7b73ff;
-  --danger: #e05252;
-  --green: #4caf8e;
-  --radius: 8px;
+  /* Cursor design tokens — light (default) */
+  --canvas:#f7f7f4; --canvas-soft:#fafaf7; --surface-card:#ffffff; --surface-strong:#e6e5e0;
+  --hairline:#e6e5e0; --hairline-soft:#efeee8; --hairline-strong:#cfcdc4;
+  --ink:#26251e; --body-c:#5a5852; --muted:#807d72; --muted-soft:#a09c92;
+  --primary:#f54e00; --primary-active:#d04200; --on-primary:#ffffff;
+  --tl-thinking:#dfa88f; --tl-grep:#9fc9a2; --tl-read:#9fbbe0; --tl-edit:#c0a8dd; --tl-done:#c08532;
+  --tl-ink:#26251e; /* text on pastel pills — constant across themes */
+  --ok:#1f8a65; --err:#cf2d56;
+  --overlay:rgba(38,37,30,.4); --row-hover:rgba(38,37,30,.03);
+  --font-sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','Fira Code',monospace;
+  /* Legacy aliases — JS-generated inline styles reference these names; never remove */
+  --bg:var(--canvas); --bg2:var(--canvas); --bg3:var(--surface-card); --bg4:var(--surface-strong);
+  --border:var(--hairline); --text:var(--ink); --text2:var(--body-c); --text3:var(--muted);
+  --accent:var(--primary); --accent-h:var(--primary-active); --danger:var(--err); --green:var(--ok);
+  --radius:8px; --radius-lg:12px;
   --sidebar-w: 240px;
 }
 
+[data-theme="dark"] {
+  --canvas:#1b1a17; --canvas-soft:#201f1c; --surface-card:#232220; --surface-strong:#38362f;
+  --hairline:#33322d; --hairline-soft:#2b2a25; --hairline-strong:#4a483f;
+  --ink:#e8e6df; --body-c:#b3b0a5; --muted:#8a877c; --muted-soft:#6d6a60;
+  --primary-active:#ff6a1f;
+  --ok:#2ea77e; --err:#e0517a;
+  --overlay:rgba(0,0,0,.55); --row-hover:rgba(232,230,223,.04);
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family: var(--font-sans);
+  background: var(--canvas);
+  color: var(--ink);
   min-height: 100vh;
   min-height: 100dvh;
   height: 100vh;
