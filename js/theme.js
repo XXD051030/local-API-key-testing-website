@@ -1,5 +1,11 @@
 // ── Light/dark theme switching ────────────────────────────────────────────────
-// Preference lives in localStorage (device-level), NOT in settings.json.
+// The preference is persisted in settings.json: the desktop app serves the UI
+// from a fresh random port on every launch, so origin-scoped localStorage
+// cannot survive restarts there. localStorage stays as a same-origin cache so
+// browser reloads paint the right theme before settings load (head FOUC guard).
+import { settings } from './state.js';
+import { persistSettings } from './storage.js';
+
 const KEY = 'apitester-theme';
 
 const MOON_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
@@ -22,14 +28,21 @@ function apply(theme) {
 }
 
 export function initTheme() {
-  let saved = null;
-  try { saved = localStorage.getItem(KEY); } catch { /* private mode etc. */ }
-  apply(saved === 'dark' ? 'dark' : 'light');
+  let cached = null;
+  try { cached = localStorage.getItem(KEY); } catch { /* private mode etc. */ }
+  const fromSettings = settings.theme === 'dark' || settings.theme === 'light'
+    ? settings.theme
+    : null;
+  const theme = fromSettings || (cached === 'dark' ? 'dark' : 'light');
+  apply(theme);
+  try { localStorage.setItem(KEY, theme); } catch { /* ignore */ }
   const btn = document.getElementById('btn-theme');
   if (btn) {
     btn.addEventListener('click', () => {
       const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
       try { localStorage.setItem(KEY, next); } catch { /* ignore */ }
+      settings.theme = next;
+      persistSettings();
       apply(next);
     });
   }
