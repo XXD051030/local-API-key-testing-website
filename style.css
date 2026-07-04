@@ -464,6 +464,7 @@ body {
 .copy-btn:hover { background: var(--surface-strong); color: var(--ink); }
 .code-block pre { margin: 0; border-radius: 0; background: var(--surface-card); }
 .code-block pre code { border-radius: 0; font-size: 13px; font-family: var(--font-mono); background: transparent; }
+.code-block pre code.hljs { background: transparent; }
 
 .msg-actions {
   display: flex;
