@@ -719,20 +719,36 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--text3);
-  gap: 12px;
+  color: var(--muted);
+  gap: 14px;
   text-align: center;
   padding: 40px;
 }
-.es-icon { font-size: 48px; opacity: .4; font-weight: 700; letter-spacing: 2px; }
-#empty-state h2 { font-size: 17px; color: var(--text2); font-weight: 500; }
-#empty-state p { font-size: 13px; line-height: 1.6; max-width: 300px; }
+.es-icon {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .88px;
+  text-transform: uppercase;
+  color: var(--body-c);
+  background: var(--surface-strong);
+  border-radius: 999px;
+  padding: 4px 12px;
+  opacity: 1;
+}
+#empty-state h2 {
+  font-size: 26px;
+  color: var(--ink);
+  font-weight: 400;
+  letter-spacing: -0.325px;
+  line-height: 1.25;
+}
+#empty-state p { font-size: 13px; line-height: 1.6; max-width: 300px; color: var(--body-c); }
 
 /* ── Input ── */
 #input-area {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hairline);
   padding: 12px 16px 16px;
-  background: var(--bg2);
+  background: var(--canvas);
   flex-shrink: 0;
 }
 
@@ -740,20 +756,20 @@ body {
   display: flex;
   gap: 8px;
   align-items: flex-end;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
   padding: 8px 12px;
   transition: border-color .15s;
 }
-#input-wrap:focus-within { border-color: var(--accent); }
+#input-wrap:focus-within { border-color: var(--ink); }
 
 #user-input {
   flex: 1;
   min-width: 0;
   background: none;
   border: none;
-  color: var(--text);
+  color: var(--ink);
   resize: none;
   outline: none;
   font-size: 14px;
@@ -762,13 +778,13 @@ body {
   min-height: 22px;
   font-family: inherit;
 }
-#user-input::placeholder { color: var(--text3); }
+#user-input::placeholder { color: var(--muted-soft); }
 
 #send-btn {
-  background: var(--accent);
+  background: var(--primary);
   border: none;
-  border-radius: 6px;
-  color: #fff;
+  border-radius: var(--radius);
+  color: var(--on-primary);
   cursor: pointer;
   padding: 6px 14px;
   font-size: 13px;
@@ -776,12 +792,12 @@ body {
   transition: background .15s;
   flex-shrink: 0;
 }
-#send-btn:hover { background: var(--accent-h); }
-#send-btn.stop { background: var(--danger); }
-#send-btn.stop:hover { background: #e86060; }
+#send-btn:hover { background: var(--primary-active); }
+#send-btn.stop { background: var(--err); }
+#send-btn.stop:hover { background: #b8264a; }
 #send-btn:disabled { opacity: .45; cursor: not-allowed; }
 
-#input-hint { font-size: 11px; color: var(--text3); margin-top: 6px; padding: 0 4px; }
+#input-hint { font-size: 11px; color: var(--muted-soft); margin-top: 6px; padding: 0 4px; }
 
 /* ── Settings Drawer ── */
 #overlay {
