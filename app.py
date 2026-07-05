@@ -12,7 +12,9 @@ Run from source:
 Packaged build (PyInstaller): see build.md.
 """
 
+import json
 import os
+import subprocess
 import sys
 import threading
 
@@ -47,6 +49,40 @@ def data_dir():
     path = os.path.join(base, APP_NAME)
     os.makedirs(path, exist_ok=True)
     return path
+
+
+def saved_theme(data_dirpath):
+    """Explicit theme choice from settings.json ('dark'/'light'), else None.
+
+    None means the user never picked a theme; the UI then follows the OS via
+    prefers-color-scheme.
+    """
+    try:
+        with open(os.path.join(data_dirpath, 'settings.json'), encoding='utf-8') as f:
+            theme = json.load(f).get('theme')
+    except (OSError, ValueError):
+        theme = None
+    return theme if theme in ('dark', 'light') else None
+
+
+def system_prefers_dark():
+    """Best-effort OS dark-mode detection, only used to color the native
+    window background before the page paints."""
+    try:
+        if sys.platform == 'darwin':
+            out = subprocess.run(
+                ['defaults', 'read', '-g', 'AppleInterfaceStyle'],
+                capture_output=True, text=True, timeout=2,
+            )
+            return out.stdout.strip() == 'Dark'
+        if sys.platform == 'win32':
+            import winreg
+            key_path = r'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+                return winreg.QueryValueEx(key, 'AppsUseLightTheme')[0] == 0
+    except Exception:
+        pass
+    return False
 
 
 def acquire_single_instance_lock(lock_path):
@@ -96,12 +132,23 @@ def main():
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
 
+    # localStorage is origin-scoped and the port changes every launch, so the
+    # page cannot know the saved theme before its first paint. Hand it over in
+    # the URL; no param means "follow the OS" (prefers-color-scheme).
+    theme = saved_theme(data)
+    url = f'http://127.0.0.1:{port}'
+    if theme:
+        url += f'/?theme={theme}'
+    dark = theme == 'dark' if theme else system_prefers_dark()
+
     webview.create_window(
         WINDOW_TITLE,
-        f'http://127.0.0.1:{port}',
+        url,
         width=1200,
         height=820,
         min_size=(720, 560),
+        # Shown while the page loads; must match the theme or startup flashes.
+        background_color='#1b1a17' if dark else '#f7f7f4',
     )
     # Blocks until the window is closed; the daemon thread then dies with us.
     webview.start()

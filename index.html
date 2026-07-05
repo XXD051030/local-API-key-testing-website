@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script>try{if(localStorage.getItem('apitester-theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
+<script>(function(){var t=(location.search.match(/[?&]theme=(dark|light)\b/)||[])[1]||null;if(!t){try{t=localStorage.getItem('apitester-theme')}catch(e){}}if(t!=='dark'&&t!=='light')t=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark')document.documentElement.dataset.theme='dark'})()</script>
 <title>API Tester</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" id="hljs-light" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
