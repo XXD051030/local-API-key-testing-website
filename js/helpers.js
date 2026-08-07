@@ -8,6 +8,22 @@ export function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+// crypto.randomUUID() is secure-context only, so it is missing when the page is
+// opened over the LAN by IP (http://192.168.x.x:8080) or straight from disk.
+// getRandomValues carries no such restriction, so fall back to it, then to
+// Math.random, keeping the same v4 shape either way.
+export function uuid() {
+  const c = window.crypto;
+  if (c && c.randomUUID) return c.randomUUID();
+  const b = new Uint8Array(16);
+  if (c && c.getRandomValues) c.getRandomValues(b);
+  else for (let i = 0; i < b.length; i++) b[i] = Math.floor(Math.random() * 256);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
+
 export function relTime(ts) {
   const d = Date.now() - ts;
   if (d < 60000)    return 'Just now';
@@ -24,12 +40,35 @@ export function toast(msg, ms = 2800) {
   el._t = setTimeout(() => el.classList.remove('show'), ms);
 }
 
+// Selection-based copy, for when navigator.clipboard is unavailable or refuses.
+// Both call sites run inside a click handler, so the user gesture execCommand
+// wants is already there.
+function legacyCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0';
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0, ta.value.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+  ta.remove();
+  return ok;
+}
+
+// navigator.clipboard is secure-context only, same restriction as
+// crypto.randomUUID above, so it is missing when the page is opened over the
+// LAN by IP or from disk. It can also reject when the document is not focused.
 export function copyText(btn, text) {
-  navigator.clipboard.writeText(text).then(() => {
+  const done = () => {
     const o = btn.textContent;
     btn.textContent = 'Copied!';
     setTimeout(() => btn.textContent = o, 1500);
-  });
+  };
+  const fallback = () => { if (legacyCopy(text)) done(); else toast('Copy failed'); };
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, fallback);
+  else fallback();
 }
 
 export function friendlyError(e) {
