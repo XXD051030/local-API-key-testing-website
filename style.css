@@ -489,6 +489,7 @@ body {
 .action-btn:hover { background: var(--surface-strong); color: var(--ink); }
 
 .token-info { font-size: 11px; color: var(--muted-soft); margin-top: 4px; }
+.msg-stat { white-space: nowrap; cursor: help; }
 .msg-badge {
   display: inline-flex;
   align-items: center;

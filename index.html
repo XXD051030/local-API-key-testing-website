@@ -151,6 +151,14 @@
             <option value="false">Disabled</option>
           </select>
         </div>
+        <div class="field-group">
+          <label class="field-label">Response Stats</label>
+          <select class="field-select" id="s-show-response-stats">
+            <option value="true">Shown</option>
+            <option value="false">Hidden</option>
+          </select>
+          <div class="field-desc">Shows time to first token, total response time and tokens/sec under each assistant reply. Tokens/sec uses the provider's reported completion tokens, or an estimate marked with "~" when usage is not returned.</div>
+        </div>
       </div>
     </div>
 

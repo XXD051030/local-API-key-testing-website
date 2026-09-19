@@ -168,6 +168,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#s-include-time-context')?.addEventListener('change', () => autoSaveGeneralSettings());
   $('#s-max-tokens')?.addEventListener('input', () => autoSaveGeneralSettings(300));
   $('#s-stream')?.addEventListener('change', () => autoSaveGeneralSettings());
+  $('#s-show-response-stats')?.addEventListener('change', () => {
+    autoSaveGeneralSettings();
+    renderMessages();
+  });
   $('#settings-drawer').addEventListener('click', e => {
     const toggleSecretBtn = e.target.closest('.toggle-secret-btn');
     if (!toggleSecretBtn) return;

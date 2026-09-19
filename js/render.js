@@ -67,9 +67,52 @@ export function buildAssistantMetaHTML(msg) {
   if (msg.tokens) {
     metaParts.push(`↑${msg.tokens.prompt_tokens||0} ↓${msg.tokens.completion_tokens||0} · total ${msg.tokens.total_tokens||0}`);
   }
+  if (settings.showResponseStats !== false) {
+    const statsHTML = buildResponseStatsHTML(msg);
+    if (statsHTML) metaParts.push(statsHTML);
+  }
   return metaParts.length
     ? `<div class="token-info" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${metaParts.join('')}</div>`
     : '';
+}
+
+function formatStatDuration(ms) {
+  const value = Number(ms);
+  if (!Number.isFinite(value) || value <= 0) return '';
+  if (value < 1000) return `${Math.round(value)}ms`;
+  if (value < 60000) return `${(value / 1000).toFixed(1)}s`;
+  const totalSeconds = Math.round(value / 1000);
+  return `${Math.floor(totalSeconds / 60)}m ${String(totalSeconds % 60).padStart(2, '0')}s`;
+}
+
+export function buildResponseStatsHTML(msg) {
+  const stats = msg?.stats;
+  if (!stats || typeof stats !== 'object') return '';
+
+  const parts = [];
+  const hints = [];
+
+  const ttft = formatStatDuration(stats.ttftMs);
+  if (ttft) {
+    parts.push(`TTFT ${ttft}`);
+    hints.push('Time to first token');
+  }
+
+  const total = formatStatDuration(stats.durationMs);
+  if (!total) return '';
+  parts.push(`${total} elapsed`);
+  hints.push('Total response time');
+
+  const tps = Number(stats.tokensPerSecond);
+  if (Number.isFinite(tps) && tps > 0) {
+    const rounded = tps >= 100 ? String(Math.round(tps)) : tps.toFixed(1);
+    parts.push(`${stats.estimated ? '~' : ''}${rounded} tok/s`);
+    hints.push(stats.estimated
+      ? 'Estimated from response length (provider did not report token usage)'
+      : 'Completion tokens ÷ generation time');
+  }
+
+  return `<span class="msg-stat" title="${escHtml(hints.join(' · '))}">${escHtml(parts.join(' · '))}</span>`;
 }
 
 export function buildSearchRunCardsHTML(search) {

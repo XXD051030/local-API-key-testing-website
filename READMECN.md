@@ -75,12 +75,26 @@
 * 搜索 provider 一次只能选一个：`Brave` 或 `Tavily`。
 * 当模型还在判断是否需要联网搜索、且首个流式 token 还没到达时，助手消息现在会立刻显示 `Thinking...`，不再先留一段空白。
 
+## 响应统计
+
+每条助手回复下方会显示一行紧凑的统计信息：
+
+* **TTFT** —— 首 token 延迟（仅流式回复显示）。
+* **elapsed** —— 本次回复总耗时。
+* **tok/s** —— `completion tokens ÷ 生成耗时`（已扣除首 token 等待时间）。如果服务商没有返回 token usage，则会根据回复长度估算，并在数值前加 `~`。
+
+可在 `Settings -> Response Stats` 中开关（默认显示）。统计数据会随会话一起保存，刷新页面或重开 App 后依然保留。
+
+流式请求会主动向服务商请求 token usage（`stream_options.include_usage`）；如果服务商拒绝该参数，会自动去掉并重试一次，因此回复仍然正常，只是 `tok/s` 会退回到带 `~` 的估算值。
+
 ## 文件说明
 
 * `index.html`: 主页面结构，以及外部资源的引用入口。
 * `style.css`: 独立拆分出的前端样式文件。
-* `js/`: 按职责拆分的前端 JavaScript 文件（`state/helpers/keys/storage/conversations/render/search/api/marked/events`）。
+* `js/`: 按职责拆分的前端 JavaScript 文件（`state/helpers/keys/storage/conversations/render/search/api/marked/theme/events`）。
 * `js/search.js`: 联网搜索设置、provider 选择、查询构造与结果标准化逻辑。
+* `js/theme.js`: 主题切换与持久化（浅色 / 深色，默认跟随系统）。
+* `fonts/`: 随包分发的 Inter 与 JetBrains Mono 字体，以及对应的 OFL 许可文件。
 * `server.py`: 用于处理 API Key 测试的后端脚本。
 * `app.py`: 桌面启动器 —— 在后台线程运行后端，并用 pywebview 打开原生窗口。
 * `build.spec` / `build.md`: PyInstaller 打包配置，以及 macOS / Windows 两平台的构建步骤。
@@ -88,6 +102,13 @@
 * `img/`: App 图标与 Logo。
 
 ## 当前版本
+
+### v3.1.0
+- 全新界面：支持**浅色 / 深色主题**（默认跟随系统，右上角可切换），内置 **Inter** 与 **JetBrains Mono** 字体，侧边栏、消息、代码块、输入区和设置抽屉整体改为 Cursor 风格。
+- 新增**响应统计**：每条助手回复下方显示首 token 延迟（TTFT）、总耗时与 tokens/sec，可在 `Settings -> Response Stats` 开关（详见 [响应统计](#响应统计)）。
+- 流式请求现在会主动请求 token usage（`stream_options.include_usage`），遇到拒绝该参数的服务商会自动回退，规范实现的服务商不再出现 token 数字时有时无的问题。
+- 修复深色主题在桌面版重启后不保留、启动瞬间闪白的问题。
+- 修复页面通过局域网访问时 `New Chat` 和 `Copy` 按钮失效的问题。
 
 ### v3.0.0
 - 打包为 **macOS 和 Windows** 独立桌面 App（pywebview + PyInstaller）—— 从 [Releases](https://github.com/XXD051030/local-API-key-testing-website/releases) 下载即用，无需安装 Python。

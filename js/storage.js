@@ -91,6 +91,7 @@ export function applySettingsToUI() {
   $('#temp-val').textContent  = settings.temperature ?? 0.7;
   $('#s-max-tokens').value    = settings.maxTokens || '';
   $('#s-stream').value        = (settings.stream !== false).toString();
+  $('#s-show-response-stats').value = (settings.showResponseStats !== false).toString();
 
   ensureCustomPresets();
   ensureActiveKeySelection();
@@ -107,6 +108,7 @@ export function readGeneralFromUI() {
   settings.temperature  = parseFloat($('#s-temperature').value);
   settings.maxTokens    = $('#s-max-tokens').value;
   settings.stream       = $('#s-stream').value === 'true';
+  settings.showResponseStats = $('#s-show-response-stats')?.value !== 'false';
   settings.model        = $('#model-selector').value;
   readSearchSettingsFromUI();
 }

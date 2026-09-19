@@ -17,6 +17,50 @@ import {
 import { newConv, activeConv, autoNameConv } from './conversations.js';
 import { persistConversations } from './storage.js';
 
+// ── Response stats (timing + tokens/sec) ─────────────────────────────────────
+const CJK_CHAR_PATTERN = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/g;
+
+function estimateTokensFromText(text) {
+  const source = String(text || '');
+  if (!source) return 0;
+  const cjkCount = (source.match(CJK_CHAR_PATTERN) || []).length;
+  const otherCount = source.length - cjkCount;
+  return cjkCount / 1.5 + otherCount / 4;
+}
+
+function attachResponseTiming(assistantMsg, startedAt) {
+  const stats = {
+    ttftMs: null,
+    durationMs: null,
+    tokensPerSecond: null,
+    estimated: false,
+  };
+  assistantMsg.stats = stats;
+  return { startedAt, stats, finalized: false };
+}
+
+function finalizeResponseStats(assistantMsg, timing) {
+  if (!timing || timing.finalized) return;
+  timing.finalized = true;
+
+  const stats = timing.stats;
+  const elapsedMs = Math.max(1, Math.round(performance.now() - timing.startedAt));
+  stats.durationMs = elapsedMs;
+
+  let completionTokens = Number(assistantMsg.tokens?.completion_tokens);
+  let estimated = false;
+  if (!Number.isFinite(completionTokens) || completionTokens <= 0) {
+    completionTokens = estimateTokensFromText(`${assistantMsg.content || ''}${assistantMsg.thinking || ''}`);
+    estimated = completionTokens > 0;
+  }
+  if (!completionTokens) return;
+
+  const ttftMs = Number.isFinite(stats.ttftMs) ? stats.ttftMs : 0;
+  const generationMs = Math.max(1, elapsedMs - ttftMs);
+  stats.tokensPerSecond = completionTokens / (generationMs / 1000);
+  stats.estimated = estimated;
+}
+
 export async function sendMessage() {
   const input = $('#user-input');
   const text  = input.value.trim();
@@ -89,6 +133,7 @@ function createAssistantDraft() {
     model: settings.model,
     search: null,
     searches: [],
+    stats: null,
   };
 }
 
@@ -266,6 +311,7 @@ async function callAPIWithAgentSearch(conv, contentEl, assistantMsg, activeKey) 
   const searchRuns = [];
 
   let data;
+  const decisionStartedAt = performance.now();
   try {
     data = await requestChatJSON(activeKey, buildChatRequestBody(decisionMsgs, {
       stream: false,
@@ -286,7 +332,9 @@ async function callAPIWithAgentSearch(conv, contentEl, assistantMsg, activeKey) 
   if (!toolCalls.length) {
     setAssistantSearchRuns(assistantMsg, []);
     if (!settings.stream) {
+      const timing = attachResponseTiming(assistantMsg, decisionStartedAt);
       applyAssistantMessageData(assistantMsg, data, contentEl);
+      finalizeResponseStats(assistantMsg, timing);
       return;
     }
     resetAssistantDraft(assistantMsg, contentEl);
@@ -334,16 +382,22 @@ async function requestFinalAssistantResponse(conv, contentEl, assistantMsg, acti
     stream: settings.stream,
   });
   setAssistantPendingState(assistantMsg, contentEl, 'thinking');
+  const startedAt = performance.now();
   const resp = await requestChatCompletion(activeKey, body, abortController.signal);
+  const timing = attachResponseTiming(assistantMsg, startedAt);
   if (settings.stream) {
-    await readStream(resp, contentEl, assistantMsg);
+    await readStream(resp, contentEl, assistantMsg, timing);
   } else {
-    const data = await resp.json();
-    applyAssistantMessageData(assistantMsg, data, contentEl);
+    try {
+      const data = await resp.json();
+      applyAssistantMessageData(assistantMsg, data, contentEl);
+    } finally {
+      finalizeResponseStats(assistantMsg, timing);
+    }
   }
 }
 
-async function readStream(resp, contentEl, assistantMsg) {
+async function readStream(resp, contentEl, assistantMsg, timing) {
   const reader  = resp.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -353,10 +407,22 @@ async function readStream(resp, contentEl, assistantMsg) {
   let renderTimerId = null;
   let thinkingDetailsOpen = true;
   let streamFinished = false;
+  let statsFinalized = false;
   let cursorActive = false;
   let contentStarted = !!assistantMsg.content;
   let rawContent = assistantMsg.content || '';
   let rawThinking = assistantMsg.thinking || '';
+
+  const markFirstToken = () => {
+    if (!timing || Number.isFinite(timing.stats.ttftMs)) return;
+    timing.stats.ttftMs = Math.max(1, Math.round(performance.now() - timing.startedAt));
+  };
+
+  const finalizeStats = () => {
+    if (statsFinalized) return;
+    statsFinalized = true;
+    finalizeResponseStats(assistantMsg, timing);
+  };
 
   const syncAssistantMessage = () => {
     const split = splitEmbeddedThinking(rawContent);
@@ -402,6 +468,7 @@ async function readStream(resp, contentEl, assistantMsg) {
       contentEl.classList.remove('streaming-cursor');
       cursorActive = false;
     }
+    finalizeStats();
     renderNow();
   };
 
@@ -427,6 +494,7 @@ async function readStream(resp, contentEl, assistantMsg) {
       if (typeof deltaContent === 'string' && deltaContent) {
         assistantMsg.pendingState = '';
         ensureStreamingCursor();
+        markFirstToken();
         rawContent += deltaContent;
         syncAssistantMessage();
         if (contentStarted && assistantMsg.thinking && thinkingDetailsOpen) {
@@ -438,6 +506,7 @@ async function readStream(resp, contentEl, assistantMsg) {
       if (typeof deltaThinking === 'string' && deltaThinking) {
         assistantMsg.pendingState = '';
         ensureStreamingCursor();
+        markFirstToken();
         rawThinking += deltaThinking;
         syncAssistantMessage();
         if (!contentStarted && !streamFinished) thinkingDetailsOpen = true;
@@ -449,26 +518,30 @@ async function readStream(resp, contentEl, assistantMsg) {
     return false;
   };
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      // Some providers stop without a final newline or a [DONE] line. The usage
-      // chunk is the last one they send, so dropping this tail drops the token
-      // counts we just went to the trouble of asking for.
-      consumeLine(buffer.trim());
-      finishStream();
-      break;
-    }
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop();
-
-    for (const line of lines) {
-      if (consumeLine(line)) {
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        // Some providers stop without a final newline or a [DONE] line. The usage
+        // chunk is the last one they send, so dropping this tail drops the token
+        // counts we just went to the trouble of asking for.
+        consumeLine(buffer.trim());
         finishStream();
-        return;
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        if (consumeLine(line)) {
+          finishStream();
+          return;
+        }
       }
     }
+  } finally {
+    finalizeStats();
   }
 }
 

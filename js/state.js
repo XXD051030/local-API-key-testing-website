@@ -8,6 +8,7 @@ export let settings = {
   temperature: 0.7,
   maxTokens: '',
   stream: true,
+  showResponseStats: true,
   presets: [],        // Key-bound model groups: [{keyId, keyName, models: string[], defaultModel}]
   thinkingModels: [],
   search: {

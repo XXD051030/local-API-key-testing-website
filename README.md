@@ -75,12 +75,26 @@ Notes:
 * Only one search provider is active at a time: `Brave` or `Tavily`.
 * While the model is deciding whether to search and before the first streamed tokens arrive, the assistant row now shows `Thinking...` immediately instead of staying blank.
 
+## Response Stats
+
+Every assistant reply shows a compact stats line under the message:
+
+* **TTFT** — time to first token (streaming replies only).
+* **elapsed** — total response time.
+* **tok/s** — `completion tokens ÷ generation time`, with the wait for the first token excluded. If the provider does not report token usage, the value is estimated from the response length and marked with `~`.
+
+Turn it on or off in `Settings -> Response Stats` (shown by default). Stats are stored with the conversation, so they survive reloads and app restarts.
+
+Streamed requests ask the provider for token usage (`stream_options.include_usage`). A provider that rejects that field is retried once without it, so its replies still work — they just fall back to the estimated `tok/s`.
+
 ## Files Included
 
 * `index.html`: Main page structure and external asset references.
 * `style.css`: Extracted frontend styles.
-* `js/`: Frontend JavaScript files split by responsibility (`state/helpers/keys/storage/conversations/render/search/api/marked/events`).
+* `js/`: Frontend JavaScript files split by responsibility (`state/helpers/keys/storage/conversations/render/search/api/marked/theme/events`).
 * `js/search.js`: Web search settings, provider selection, query preparation, and result normalization.
+* `js/theme.js`: Theme switching and persistence (light/dark, follows the OS by default).
+* `fonts/`: Bundled Inter and JetBrains Mono webfonts, with their OFL licenses.
 * `server.py`: The backend script for handling API key testing.
 * `app.py`: Desktop launcher — runs the backend in a background thread and opens a native window (pywebview).
 * `build.spec` / `build.md`: PyInstaller packaging config and step-by-step build instructions for macOS and Windows.
@@ -88,6 +102,13 @@ Notes:
 * `img/`: App logo and icons.
 
 ## Current Version
+
+### v3.1.0
+- New UI with **light and dark themes** (follows the OS by default, toggle in the top bar), bundled **Inter** and **JetBrains Mono** fonts, and a Cursor-style restyle of the sidebar, messages, code blocks, input area and settings drawer.
+- Added **response stats** under every assistant reply: time to first token (TTFT), total response time and tokens/sec, with a `Settings -> Response Stats` toggle. See [Response Stats](#response-stats).
+- Streamed replies now explicitly ask providers for token usage (`stream_options.include_usage`) and fall back automatically when a provider rejects the field, so token counts no longer disappear on spec-compliant APIs.
+- Fixed dark theme preference not persisting across desktop app restarts, and the light-theme flash on startup.
+- Fixed `New Chat` and `Copy` going dead when the page is served over the LAN.
 
 ### v3.0.0
 - Packaged as a standalone desktop app for **macOS and Windows** (pywebview + PyInstaller) — download from [Releases](https://github.com/XXD051030/local-API-key-testing-website/releases), no Python required.
