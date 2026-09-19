@@ -1,13 +1,13 @@
 // ── Conversation management ───────────────────────────────────────────────────
 import { settings, conversations, activeConvId, setConversations, setActiveConvId } from './state.js';
 import { normalizeSearchSettings } from './state.js';
-import { $ } from './helpers.js';
+import { $, uuid } from './helpers.js';
 import { getSearchSettings } from './search.js';
 import { persistSettings, persistConversations } from './storage.js';
 import { renderConvList, renderMessages, updateRegenBtn } from './render.js';
 
 export function newConv() {
-  const id   = crypto.randomUUID();
+  const id   = uuid();
   const conv = { id, name: 'New Chat', created: Date.now(), messages: [] };
   conversations.unshift(conv);
   settings.search = normalizeSearchSettings({

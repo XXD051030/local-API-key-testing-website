@@ -15,6 +15,7 @@ datas = [
     ('index.html', '.'),
     ('style.css', '.'),
     ('js', 'js'),
+    ('fonts', 'fonts'),
 ]
 
 a = Analysis(

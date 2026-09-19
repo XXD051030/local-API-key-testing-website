@@ -135,7 +135,19 @@ function buildChatRequestBody(messages, options = {}) {
   return body;
 }
 
-async function requestChatCompletion(activeKey, body, signal) {
+// Providers that answered a `stream_options` request with a schema error. They
+// only get asked once per session; after that we fall back to plain streaming.
+const noStreamUsageKeys = new Set();
+
+function isStreamOptionsRejection(err) {
+  if (err?.name === 'AbortError') return false;
+  if (/stream_options/i.test(String(err?.message || ''))) return true;
+  // An unknown request field reads as a bad request; auth, quota and 5xx do not
+  // and must surface as-is instead of triggering a pointless second call.
+  return err?.status === 400 || err?.status === 422;
+}
+
+async function postChatCompletion(activeKey, body, signal) {
   const resp = await proxyFetch(`${activeKey.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeKey.key}` },
@@ -147,10 +159,39 @@ async function requestChatCompletion(activeKey, body, signal) {
     const errText = await resp.text();
     let errMsg = `HTTP ${resp.status}`;
     try { const j = JSON.parse(errText); errMsg = j.error?.message || errMsg; } catch(_) {}
-    throw new Error(errMsg);
+    const err = new Error(errMsg);
+    err.status = resp.status;
+    throw err;
   }
 
   return resp;
+}
+
+async function requestChatCompletion(activeKey, body, signal) {
+  // A streamed response carries no `usage` unless the client asks for it. Some
+  // providers volunteer it regardless, which is why token counts appeared for
+  // some models and silently vanished for others. `stream_options` is only
+  // legal next to stream:true, so blocking requests must go out untouched.
+  const withUsage = body.stream === true && !noStreamUsageKeys.has(activeKey.id);
+  if (!withUsage) return postChatCompletion(activeKey, body, signal);
+
+  try {
+    return await postChatCompletion(
+      activeKey,
+      { ...body, stream_options: { include_usage: true } },
+      signal,
+    );
+  } catch (err) {
+    if (!isStreamOptionsRejection(err)) throw err;
+    let resp;
+    try {
+      resp = await postChatCompletion(activeKey, body, signal);
+    } catch (_) {
+      throw err; // stream_options wasn't the problem — report the original failure
+    }
+    noStreamUsageKeys.add(activeKey.id);
+    return resp;
+  }
 }
 
 async function requestChatJSON(activeKey, body, signal) {
@@ -369,9 +410,52 @@ async function readStream(resp, contentEl, assistantMsg) {
   // Initial render (thinking open while streaming)
   contentEl.innerHTML = renderAssistantContentHTML(assistantMsg, true);
 
+  // Returns true once the provider has signalled end-of-stream.
+  const consumeLine = (line) => {
+    if (!line.startsWith('data: ')) return false;
+    const data = line.slice(6).trim();
+    if (data === '[DONE]') return true;
+    try {
+      const json  = JSON.parse(data);
+      const delta = json.choices?.[0]?.delta || {};
+      const deltaContent = delta.content;
+      const deltaThinking =
+        delta.reasoning_content ??
+        delta.reasoning ??
+        delta.thought;
+
+      if (typeof deltaContent === 'string' && deltaContent) {
+        assistantMsg.pendingState = '';
+        ensureStreamingCursor();
+        rawContent += deltaContent;
+        syncAssistantMessage();
+        if (contentStarted && assistantMsg.thinking && thinkingDetailsOpen) {
+          thinkingDetailsOpen = false;
+        }
+        requestRender();
+      }
+
+      if (typeof deltaThinking === 'string' && deltaThinking) {
+        assistantMsg.pendingState = '';
+        ensureStreamingCursor();
+        rawThinking += deltaThinking;
+        syncAssistantMessage();
+        if (!contentStarted && !streamFinished) thinkingDetailsOpen = true;
+        requestRender();
+      }
+
+      if (json.usage) assistantMsg.tokens = json.usage;
+    } catch(_) {}
+    return false;
+  };
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) {
+      // Some providers stop without a final newline or a [DONE] line. The usage
+      // chunk is the last one they send, so dropping this tail drops the token
+      // counts we just went to the trouble of asking for.
+      consumeLine(buffer.trim());
       finishStream();
       break;
     }
@@ -380,43 +464,10 @@ async function readStream(resp, contentEl, assistantMsg) {
     buffer = lines.pop();
 
     for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const data = line.slice(6).trim();
-      if (data === '[DONE]') {
+      if (consumeLine(line)) {
         finishStream();
         return;
       }
-      try {
-        const json  = JSON.parse(data);
-        const delta = json.choices?.[0]?.delta || {};
-        const deltaContent = delta.content;
-        const deltaThinking =
-          delta.reasoning_content ??
-          delta.reasoning ??
-          delta.thought;
-
-        if (typeof deltaContent === 'string' && deltaContent) {
-          assistantMsg.pendingState = '';
-          ensureStreamingCursor();
-          rawContent += deltaContent;
-          syncAssistantMessage();
-          if (contentStarted && assistantMsg.thinking && thinkingDetailsOpen) {
-            thinkingDetailsOpen = false;
-          }
-          requestRender();
-        }
-
-        if (typeof deltaThinking === 'string' && deltaThinking) {
-          assistantMsg.pendingState = '';
-          ensureStreamingCursor();
-          rawThinking += deltaThinking;
-          syncAssistantMessage();
-          if (!contentStarted && !streamFinished) thinkingDetailsOpen = true;
-          requestRender();
-        }
-
-        if (json.usage) assistantMsg.tokens = json.usage;
-      } catch(_) {}
     }
   }
 }

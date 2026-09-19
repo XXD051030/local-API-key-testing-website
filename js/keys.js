@@ -1,6 +1,6 @@
 // ── Key-bound Model presets ───────────────────────────────────────────────────
 import { settings, editingKeyId, setEditingKeyId } from './state.js';
-import { $, escHtml, toast, proxyFetch, friendlyError, syncSendButton } from './helpers.js';
+import { $, escHtml, toast, proxyFetch, friendlyError, syncSendButton, uuid } from './helpers.js';
 import { renderKeyList, renderKeySelector } from './render.js';
 import { persistSettings } from './storage.js';
 
@@ -188,7 +188,7 @@ export function saveKeyFromForm(form) {
 
   const editId = form.dataset.editing;
   if (editId === 'new') {
-    const newK = { id: 'key_' + crypto.randomUUID(), name, baseUrl: url, key };
+    const newK = { id: 'key_' + uuid(), name, baseUrl: url, key };
     settings.apiKeys.push(newK);
     if (settings.apiKeys.length === 1) {
       settings.activeKeyId = newK.id;
